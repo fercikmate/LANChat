@@ -19,6 +19,7 @@
 #define SERVER_PORT 27015					// Port number of server that will be used for communication with clients
 #define BUFFER_SIZE 512						// Size of buffer that will be used for sending and receiving messages to client
 #define serverPort 8080
+int getUserName(char* username);
 SOCKET setupServerSocket()
 {
 	struct sockaddr_in servAddr;
@@ -69,17 +70,29 @@ int sendUDPalive() {
 		printf("Creating UDP socket failed with error: %d\n", WSAGetLastError());
 		return -1;
 	}
-	const char* message = "Alive";
-	int sendResult = sendto(udpSocket, message, (int)strlen(message), 0, (struct sockaddr*)&cliAddr, sizeof(cliAddr));
+	char username[BUFFER_SIZE];
+	if (getUserName(username) == -1) {
+		printf("Failed to get username");
+		_getch();
+		return -1;
+	}
 
+
+	if (sendto(udpSocket, username, (int)strlen(username), 0, (struct sockaddr*)&cliAddr, sizeof(cliAddr)) == SOCKET_ERROR) {
+		printf("sendto failed with error: %d\n", WSAGetLastError());
+		closesocket(udpSocket);
+		return -1;
+	}
+
+	printf("Alive msg sent with username %s\n", username);
 	
 	return 0;
 }
 
 int getUserName(char* username) {
-	printf("=====================================\n");
-	printf("Welcome! Enter your username: ");
-	printf("=====================================\n");
+	printf("===========================\n");
+	printf("Welcome! Enter your username: \n");
+	printf("===========================\n");
 
 	if (fgets(username, BUFFER_SIZE, stdin) == NULL) {
 		printf("Error reading username\n");
@@ -113,6 +126,12 @@ int main()
 		WSACleanup();
 		return -1;
 	}
+	if (sendUDPalive() == -1) {
+		printf("Press a button to exit the application due to failing to send ALIVE msg.\n");
+		char ch = _getch();
+		closesocket(serverSocket);
+		WSACleanup();
+	}
 	//Declare clientaddress for recvfrom
 	char dataBuffer[BUFFER_SIZE];
 	sockaddr_in6 clientAddress;
@@ -123,7 +142,8 @@ int main()
 
 	// size of client address
 	int sockAddrLen = sizeof(clientAddress);
-	
+	printf("===========================\n");
+	printf("Awaiting connections...");
 	if (recvfrom(serverSocket, dataBuffer, BUFFER_SIZE, 0, (struct sockaddr*)&clientAddress, &sockAddrLen) < 0) {
 		printf("Error receiving data on UDP socket\n");
 		closesocket(serverSocket);

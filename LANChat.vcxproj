@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{a5a2f8c6-eca6-4df4-8326-ca9ebb84eb2e}</ProjectGuid>
+    <RootNamespace>LANChat</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>Default</ConformanceMode>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>winmm.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS.;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>Default</ConformanceMode>
+      <LanguageStandard>Default</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>winmm.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="kernel\buffers.cpp" />
+    <ClCompile Include="kernel\buffersQueue.cpp" />
+    <ClCompile Include="kernel\Client.cpp" />
+    <ClCompile Include="kernel\Distribution.cpp" />
+    <ClCompile Include="kernel\errorObject.cpp" />
+    <ClCompile Include="kernel\fsm.cpp" />
+    <ClCompile Include="kernel\fsmSystem.cpp" />
+    <ClCompile Include="kernel\kernelAPI.cpp" />
+    <ClCompile Include="kernel\KernelFunctions.cpp" />
+    <ClCompile Include="kernel\linuxFunctions.cpp" />
+    <ClCompile Include="kernel\logAutomate.cpp" />
+    <ClCompile Include="kernel\LogFile.cpp" />
+    <ClCompile Include="kernel\mailbox.cpp" />
+    <ClCompile Include="kernel\messages.cpp" />
+    <ClCompile Include="kernel\msgInterface.cpp" />
+    <ClCompile Include="kernel\NetFSM.cpp" />
+    <ClCompile Include="kernel\postOffice.cpp" />
+    <ClCompile Include="kernel\standardMsg.cpp" />
+    <ClCompile Include="kernel\stdMsgpc16pl16.cpp" />
+    <ClCompile Include="kernel\systemFunctions.cpp" />
+    <ClCompile Include="kernel\systemTCP.cpp" />
+    <ClCompile Include="kernel\thread.cpp" />
+    <ClCompile Include="kernel\timer.cpp" />
+    <ClCompile Include="kernel\TransportInterface.cpp" />
+    <ClCompile Include="kernel\UdpFSM.cpp" />
+    <ClCompile Include="kernel\UdpLogInterface.cpp" />
+    <ClCompile Include="Source\ClientTCPfsm.cpp" />
+    <ClCompile Include="Source\main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="kernel\buffers.h" />
+    <ClInclude Include="kernel\buffersQueue.h" />
+    <ClInclude Include="kernel\Client.h" />
+    <ClInclude Include="kernel\Distribution.h" />
+    <ClInclude Include="kernel\errorObject.h" />
+    <ClInclude Include="kernel\fsm.h" />
+    <ClInclude Include="kernel\fsmSystem.h" />
+    <ClInclude Include="kernel\kernelAPI.h" />
+    <ClInclude Include="kernel\kernelConsts.h" />
+    <ClInclude Include="kernel\kernelTypes.h" />
+    <ClInclude Include="kernel\linuxThread.h" />
+    <ClInclude Include="kernel\logAutomate.h" />
+    <ClInclude Include="kernel\LogFile.h" />
+    <ClInclude Include="kernel\mailbox.h" />
+    <ClInclude Include="kernel\messages.h" />
+    <ClInclude Include="kernel\msgInterface.h" />
+    <ClInclude Include="kernel\NetException.h" />
+    <ClInclude Include="kernel\NetFSM.h" />
+    <ClInclude Include="kernel\postOffice.h" />
+    <ClInclude Include="kernel\standardMsg.h" />
+    <ClInclude Include="kernel\stdMsgpc16pl16.h" />
+    <ClInclude Include="kernel\systemFunctions.h" />
+    <ClInclude Include="kernel\systemTCP.h" />
+    <ClInclude Include="kernel\thread.h" />
+    <ClInclude Include="kernel\ThreadException.h" />
+    <ClInclude Include="kernel\timer.h" />
+    <ClInclude Include="kernel\TransportInterface.h" />
+    <ClInclude Include="kernel\UdpFSM.h" />
+    <ClInclude Include="kernel\UdpLogInterface.h" />
+    <ClInclude Include="kernel\uniSock.h" />
+    <ClInclude Include="Source\ClientTCPfsm.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="kernel\KernelLib.lib" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

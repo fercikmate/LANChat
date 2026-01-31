@@ -19,7 +19,7 @@
 #define SERVER_PORT 27015					// Port number of server that will be used for communication with clients
 #define BUFFER_SIZE 512						// Size of buffer that will be used for sending and receiving messages to client
 #define serverPort 8080
-int setupServerSocket()
+SOCKET setupServerSocket()
 {
 	struct sockaddr_in servAddr;
 	WSADATA wsaData;
@@ -56,7 +56,7 @@ int setupServerSocket()
 		return -1;
 	}
 	printf("UDP server is up and running! Listening on port: %d...\n", serverPort);
-	return 0;
+	return serverSocket;
 }
 
 int sendUDPalive() {
@@ -75,17 +75,62 @@ int sendUDPalive() {
 	
 	return 0;
 }
+
+int getUserName(char* username) {
+	printf("=====================================\n");
+	printf("Welcome! Enter your username: ");
+	printf("=====================================\n");
+
+	if (fgets(username, BUFFER_SIZE, stdin) == NULL) {
+		printf("Error reading username\n");
+		return -1;
+	}
+
+	// Remove newline character if present
+	size_t len = strlen(username);
+	if (len > 0 && username[len - 1] == '\n') {
+		username[len - 1] = '\0';
+		len--;
+	}
+
+	// Check if username is empty
+	if (len == 0) {
+		printf("Username cannot be empty\n");
+		return -1;
+	}
+
+	printf("Username set to: %s\n", username);
+	return 0;
+}
+
 int main()
 {
 	//Set up server
-	if (setupServerSocket() == -1) {
+	SOCKET serverSocket = setupServerSocket();
+	if (serverSocket == -1) {
 		printf("Press a button to exit the application due to socket setup failure.\n");
 		char ch = _getch();
 		WSACleanup();
 		return -1;
 	}
+	//Declare clientaddress for recvfrom
+	char dataBuffer[BUFFER_SIZE];
+	sockaddr_in6 clientAddress;
+	memset(&clientAddress, 0, sizeof(clientAddress));
+
+	// Set whole buffer to zero
+	memset(dataBuffer, 0, BUFFER_SIZE);
+
+	// size of client address
+	int sockAddrLen = sizeof(clientAddress);
 	
-	
+	if (recvfrom(serverSocket, dataBuffer, BUFFER_SIZE, 0, (struct sockaddr*)&clientAddress, &sockAddrLen) < 0) {
+		printf("Error receiving data on UDP socket\n");
+		closesocket(serverSocket);
+		WSACleanup();
+		return -1;
+	}
+	//TODO: worker thread to 
 	AutoExample autoExample;
 	autoExample.Initialize();
 	autoExample.Start();

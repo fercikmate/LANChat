@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "ClientTCPfsm.h"
 
-AutoExample::AutoExample() : FiniteStateMachine(AUTOEXAMPLE_FSM, AUTOEXAMPLE_MBX_ID, 10, 10, 10) {
+AutoExample::AutoExample() : FiniteStateMachine(AUTOEXAMPLE_FSM, AUTOEXAMPLE_MBX_ID, 10, 10, 10) { 
 }
 
 AutoExample::~AutoExample() {

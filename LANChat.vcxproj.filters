@@ -99,6 +99,9 @@
     <ClCompile Include="Source\ClientTCPfsm.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Source\ClientSearchFSM.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="kernel\buffers.h">
@@ -192,6 +195,9 @@
       <Filter>kernel</Filter>
     </ClInclude>
     <ClInclude Include="Source\ClientTCPfsm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\ClientSearchFSM.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

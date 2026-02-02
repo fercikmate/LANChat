@@ -1,46 +1,32 @@
+#pragma once
+
 #include <stdio.h>
-#include "ClientTCPfsm.h"
-
-AutoExample::AutoExample() : FiniteStateMachine(AUTOEXAMPLE_FSM, AUTOEXAMPLE_MBX_ID, 10, 10, 10) { 
-}
-
-AutoExample::~AutoExample() {
-}
+#include "ClientSearchFSM.h"
 
 
-uint8 AutoExample::GetAutomate() {
-	return AUTOEXAMPLE_FSM;
-}
 
-/* This function actually connnects the AutoExamplee with the mailbox. */
-uint8 AutoExample::GetMbxId() {
-	return AUTOEXAMPLE_MBX_ID;
-}
+#define AUTOEXAMPLE_MBX_ID    0
+#define AUTOEXAMPLE_FSM       0
 
-MessageInterface* AutoExample::GetMessageInterface(uint32 id) {
-	if (id == 0)
-		return &StandardMsgCoding;
-	throw TErrorObject(__LINE__, __FILE__, 0x01010400);
-}
+typedef stdMsg_pc16_pl16 StandardMessage;
 
-void AutoExample::SetDefaultHeader(uint8 infoCoding) {
-	SetMsgInfoCoding(infoCoding);
-	SetMessageFromData();
-}
+class AutoExample : public FiniteStateMachine {
+	enum AutoExampleStates { AUTO_STATE0, AUTO_STATE1, AUTO_STATE2 };
 
-void AutoExample::SetDefaultFSMData() {
+	StandardMessage StandardMsgCoding;
 
-}
+	/* FiniteStateMachine abstract functions */
+	MessageInterface* GetMessageInterface(uint32 id);
+	void	SetDefaultHeader(uint8 infoCoding);
+	void	SetDefaultFSMData();
+	void	NoFreeInstances();
+	uint8	GetMbxId();
+	uint8	GetAutomate();
 
-void AutoExample::NoFreeInstances() {
-	printf("[%d] AutoExample::NoFreeInstances()\n", GetObjectId());
-}
+public:
+	AutoExample();
+	~AutoExample();
 
-void AutoExample::Initialize() {
-	SetState(AUTO_STATE0);
-	SetDefaultFSMData();
-}
-
-/* Initial system message */
-void AutoExample::Start() {
-}
+	void Initialize();
+	void Start();
+};

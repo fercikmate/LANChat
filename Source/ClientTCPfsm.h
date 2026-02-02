@@ -8,7 +8,6 @@
 #define AUTOEXAMPLE_MBX_ID    0
 #define AUTOEXAMPLE_FSM       0
 
-#include "../kernel/stdMsgpc16pl16.h"
 typedef stdMsg_pc16_pl16 StandardMessage;
 
 class AutoExample : public FiniteStateMachine {

@@ -59,8 +59,7 @@ DWORD WINAPI SystemThread(void* data) {
 	/* Start the first automate - handles login, UDP alive, and server setup */
 	automate.Start();
 
-	/* Starts the system - dispatches system messages */
-	printf("[*] Starting system...\n");
+	
 	UDP_sys.Start();
 
 	/* Finish thread */

@@ -86,8 +86,10 @@ void DeviceSearch::Start() {
 	printf("Username set to: %s\n", username);
 	
 	// Send UDP ALIVE message with username
-	SendUdpBroadcast();
 	StartUDPListening();
+	Sleep(1000);
+	SendUdpBroadcast();
+
 	SetState(IDLE);
 }
 
@@ -178,6 +180,11 @@ void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* se
 	//  message format
 	// "OK|username" = OK response
 	// "username" = ALIVE broadcast
+//  message format
+	// "OK|username" = OK response
+	// message format
+	// "OK|sender|target" = OK response (broadcast, filter by target)
+	// "username" = ALIVE broadcast
 
 	char peerIP[16];
 	strcpy(peerIP, inet_ntoa(sender->sin_addr));
@@ -189,8 +196,35 @@ void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* se
 	if (strncmp(data, "OK|", 3) == 0) {
 		// This is an OK message
 		msgType = MSG_UDP_OK_RECEIVED;
-		strcpy(content, data + 3);  // Skip "OK|" prefix
-		printf("[FSM] Detected OK message from %s, username: %s\n", peerIP, content);
+		//strcpy(content, data + 3);  // Skip "OK|" prefix
+		char senderName[BUFFER_SIZE];
+		char targetName[BUFFER_SIZE];
+		const char* payload = data + 3;
+		const char* separator = strchr(payload, '|');
+
+		if (separator == nullptr) {
+			printf("[FSM] Invalid OK message from %s: %s\n", peerIP, data);
+			return;
+		}
+
+		size_t senderLen = static_cast<size_t>(separator - payload);
+		if (senderLen >= BUFFER_SIZE) {
+			printf("[FSM] OK sender name too long from %s\n", peerIP);
+			return;
+		}
+
+		strncpy(senderName, payload, senderLen);
+		senderName[senderLen] = '\0';
+		strncpy(targetName, separator + 1, BUFFER_SIZE - 1);
+		targetName[BUFFER_SIZE - 1] = '\0';
+
+		if (strcmp(targetName, username) != 0) {
+		//	printf("[FSM] OK message from %s ignored (target: %s)\n", peerIP, targetName);
+			return;
+		}
+
+		strcpy(content, senderName);
+		
 	}
 	else {
 		// This is an ALIVE message
@@ -200,8 +234,9 @@ void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* se
 	}
 	if (strcmp(content, username) == 0) {
 		// Don't process self messages
-		printf("[FSM] Ignoring message from self: %s\n", content);
-		return;  
+	//	printf("[FSM] Ignoring message from self: %s\n", content);
+		return;
+		return;
 	}
 	// Create FSM message with the data
 	PrepareNewMessage(0x00, msgType);
@@ -226,10 +261,10 @@ void DeviceSearch::SendOk() {
 	memcpy(peerIP, ipParam + 4, ipParam[2]);
 	peerIP[ipParam[2]] = '\0';
 
-	struct sockaddr_in peerAddr;
-	peerAddr.sin_family = AF_INET;
-	peerAddr.sin_addr.s_addr = inet_addr(peerIP);
-	peerAddr.sin_port = htons(SERVER_PORT);
+	struct sockaddr_in broadcastAddr;
+	broadcastAddr.sin_family = AF_INET;
+	broadcastAddr.sin_addr.s_addr = inet_addr(CLIENT_ADDRESS);
+	broadcastAddr.sin_port = htons(SERVER_PORT);
 
 	SOCKET udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (udpSocket == INVALID_SOCKET) {
@@ -238,12 +273,16 @@ void DeviceSearch::SendOk() {
 	}
 
 	// Format: "OK|username"
+	int broadcast = 1;
+	setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST,
+		(char*)&broadcast, sizeof(broadcast));
+
 	char okMessage[BUFFER_SIZE];
-	sprintf(okMessage, "OK|%s", username);
-	Sleep(100);
+	sprintf(okMessage, "OK|%s|%s", username, peerUsername);
+
 	int sendResult = sendto(udpSocket, okMessage, strlen(okMessage), 0,
-		(struct sockaddr*)&peerAddr, sizeof(peerAddr));
-	
+		(struct sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
+	Sleep(100);
 	if (sendResult == SOCKET_ERROR) {
 		printf("[%d] Failed to send OK: %d\n", GetObjectId(), WSAGetLastError());
 	}

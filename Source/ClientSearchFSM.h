@@ -17,6 +17,8 @@
 #define MSG_UDP_CONNECTED       0x0004
 #define MSG_UDP_MESSAGE         0x0005
 
+
+
 #define PARAM_USERNAME      0x01
 #define PARAM_IP_ADDRESS    0x02
 #define PARAM_PORT          0x03

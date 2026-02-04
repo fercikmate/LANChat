@@ -17,7 +17,7 @@
 #pragma comment (lib, "AdvApi32.lib") 
 
 #define BUFFER_SIZE 512						//Max msg size
-
+HANDLE hFsmMutex = CreateMutex(NULL, FALSE, NULL); // Mutex for thread safety
 int initializeWSA() {
 	WSADATA wsaData;
 	// Initialize Winsock library
@@ -35,36 +35,31 @@ int initializeWSA() {
 /* FSM system instance. */
 FSMSystem Client_sys(2 /* max number of automates types */, 2 /* max number of msg boxes */);
 
-DWORD WINAPI SystemThread(void* data) {
-	DeviceSearch udpAutomate; //initialize UDP automate
-	TCPComs tcpAutomate;  //initialize TCP automate
 
-	/* Kernel buffer description block */
-	/* number of buffer types */
+DWORD WINAPI SystemThread(void* data) {
+	DeviceSearch udpAutomate;
+	TCPComs tcpPool[10];
+
 	const uint8 buffClassNo = 4;
-	/* number of buffers of each buffer type */
 	uint32 buffsCount[buffClassNo] = { 50, 50, 50, 10 };
-	/* buffer size for each buffer type */
 	uint32 buffsLength[buffClassNo] = { 128, 256, 512, 1024 };
 
-	/* Logging setting - to a file in this case */
-	LogFile lf("log.log" /*log file name*/, "./log.ini" /* message translator file */);
+	LogFile lf("log.log", "./log.ini");
 	LogAutomateNew::SetLogInterface(&lf);
 
-	/* Mandatory kernel initialization */
 	printf("[*] Initializing system...\n");
 	Client_sys.InitKernel(buffClassNo, buffsCount, buffsLength, 5);
 
-	/* Add UDP automate - type 0 */
+	/* Add UDP automate */
 	Client_sys.Add(&udpAutomate, UDP_FSM, 1, true);
-	
-	/* Initialize TCP automate type with maximum of 10 slots */
-	Client_sys.Add(&tcpAutomate, TCP_FSM, 10, true);
 
-	/* Start the first automate - handles login, UDP alive, and server setup */
+	Client_sys.Add(&tcpPool[0], TCP_FSM, 10, true);
+	/* Pre-allocate all 10 TCP automates from the pool */
+	for (int i = 1; i < 10; i++) {
+		Client_sys.Add(&tcpPool[i], TCP_FSM);
+	}
+
 	udpAutomate.Start();
-
-	
 	Client_sys.Start();
 
 	/* Finish thread */

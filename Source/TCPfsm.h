@@ -16,6 +16,11 @@
 #define MSG_USER_INPUT          0x0003
 #define MSG_TCP_CONNECTED       0x0004
 #define MSG_TCP_MESSAGE         0x0005
+#define MSG_TCP_DISCONNECTED    0x0006
+#define MSG_TCP_HEARTBEAT       0x0007
+#define MSG_TCP_SHUTDOWN        0x0008
+#define MSG_TCP_THREAD_START	0x0009
+#define IS_SERVER_PARAM        0x000A
 
 #define PARAM_USERNAME      0x01
 #define PARAM_IP_ADDRESS    0x02
@@ -25,7 +30,7 @@
 typedef stdMsg_pc16_pl16 StandardMessage;
 
 class TCPComs : public FiniteStateMachine {
-	enum TCPComsStates { CONNECTING_SERVER, CONNECTING_CLIENT, CONNECTED, SHUTDOWN_SENT, SHUTDOWN_REC, HEARTBEAT };
+	enum TCPComsStates { IDLE, CONNECTING_SERVER, CONNECTING_CLIENT, CONNECTED, SHUTDOWN_SENT, SHUTDOWN_REC, HEARTBEAT };
 
 	StandardMessage StandardMsgCoding;
 
@@ -40,18 +45,30 @@ class TCPComs : public FiniteStateMachine {
 
 private:
 	SOCKET m_tcpSocket;
+
 	HANDLE ListenerThread;
-	DWORD ThreadID;
+	DWORD dwListenerThreadID;
+
+	bool m_isServer;
 	char m_peerIP[16];
 	char m_peerUsername[BUFFER_SIZE];
-	bool m_isServer;
+	
+	// Add these for the connection worker thread:
+	HANDLE hConnectionThread;
+	DWORD dwConnectionThreadID;
+
 	static DWORD WINAPI TCPListenerThread(LPVOID param);
+
+	static DWORD WINAPI ConnectionWorkerThread(LPVOID param);
+
 	void TCPMsg_2_FSMMsg(const char* data, int length, sockaddr_in* sender);
 	void CreateThread();
 	void SendOk();
 	void GotOk();
 	void SendTCPBroadcast();
 	void StartTCPListening();
+	void ProcessConnectionRequest();
+	void ConnectionClosed();
 	
 
 
@@ -68,8 +85,8 @@ public:
 		strcpy(m_peerIP, ip);
 		strcpy(m_peerUsername, username);
 		m_isServer = isServer;
-		printf("[%d] TCP FSM configured: %s (%s), server=%d\n",
-			GetObjectId(), m_peerUsername, m_peerIP, m_isServer);
+		printf("[TCP_FSM] TCP FSM configured: %s (%s), server=%d\n",
+			m_peerUsername, m_peerIP, m_isServer);
 	}
 
 

@@ -50,7 +50,7 @@ void DeviceSearch::SetDefaultFSMData() {
 }
 
 void DeviceSearch::NoFreeInstances() {
-	printf("[%d] DeviceSearch::NoFreeInstances()\n", GetObjectId());
+	printf("[UDP_FSM] DeviceSearch::NoFreeInstances()\n");
 }
 
 void DeviceSearch::Initialize() {
@@ -66,7 +66,7 @@ void DeviceSearch::GetUsername() {
 }
 
 void DeviceSearch::Start() {
-	printf("[%d] DeviceSearch::Start() called\n", GetObjectId());
+	printf("[UDP_FSM] DeviceSearch::Start() called\n");
 	
 	// LOGIN - Get username from user
 	printf("===========================\n");
@@ -74,7 +74,7 @@ void DeviceSearch::Start() {
 	printf("===========================\n");
 
 	if (fgets(username, BUFFER_SIZE, stdin) == NULL) {
-		printf("Error reading username\n");
+		printf("[UDP_FSM] Error reading username\n");
 		return;
 	}
 
@@ -87,11 +87,11 @@ void DeviceSearch::Start() {
 
 	// Check if username is empty	
 	if (len == 0) {
-		printf("Username cannot be empty\n");
+		printf("[UDP_FSM] Username cannot be empty\n");
 		return;
 	}
 
-	printf("Username set to: %s\n", username);
+	printf("[UDP_FSM] Username set to: %s\n", username);
 	
 	// Send UDP ALIVE message with username
 	StartUDPListening();
@@ -116,7 +116,7 @@ void DeviceSearch::SendUdpBroadcast() {
 	sendto(udpSocket, username, strlen(username), 0,
 		(struct sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
 
-	printf("[%d] Broadcast ALIVE sent with username: %s\n", GetObjectId(),username);
+	printf("[UDP_FSM] Broadcast ALIVE sent with username: %s\n",username);
 	closesocket(udpSocket);
 }
 
@@ -129,7 +129,7 @@ void DeviceSearch::StartUDPListening() {
 
 	m_udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (m_udpSocket == INVALID_SOCKET) {
-		printf("Failed to create UDP socket: %d\n", WSAGetLastError());
+		printf("[UDP_FSM] Failed to create UDP socket: %d\n", WSAGetLastError());
 		return;
 	}
 
@@ -138,13 +138,13 @@ void DeviceSearch::StartUDPListening() {
 		(char*)&reuse, sizeof(reuse));
 
 	if (bind(m_udpSocket, (struct sockaddr*)&servAddr, sizeof(servAddr)) < 0) {
-		printf("Failed to bind UDP socket: %d\n", WSAGetLastError());
+		printf("[UDP_FSM] Failed to bind UDP socket: %d\n", WSAGetLastError());
 		closesocket(m_udpSocket);
 		return;
 	}
 
 	
-	printf("[%d] UDP listener started on port %d\n", GetObjectId(), SERVER_PORT);
+	printf("[UDP_FSM] UDP listener started on port %d\n", SERVER_PORT);
 
 	// Create listener thread using Windows API, not member function
 	ListenerThread = ::CreateThread(
@@ -159,7 +159,7 @@ DWORD WINAPI DeviceSearch::UdpListenerThread(LPVOID param) {
 	sockaddr_in senderAddr;
 	int senderAddrLen = sizeof(senderAddr);
 
-	printf("[Thread] UDP listener thread started\n");
+	printf("[UDP_Listener_Thread] UDP listener thread started\n");
 
 	while (true) {  
 		memset(buffer, 0, BUFFER_SIZE);
@@ -170,7 +170,7 @@ DWORD WINAPI DeviceSearch::UdpListenerThread(LPVOID param) {
 			(struct sockaddr*)&senderAddr, &senderAddrLen);
 
 		if (recvLen < 0) {
-			printf("[Thread] recvfrom failed: %d\n", WSAGetLastError());
+			printf("[UDP_Listener_Thread] recvfrom failed: %d\n", WSAGetLastError());
 			break;
 		}
 
@@ -185,7 +185,7 @@ DWORD WINAPI DeviceSearch::UdpListenerThread(LPVOID param) {
 		}
 	}
 
-	printf("[Thread] UDP listener thread stopped\n");
+	printf("[UDP_Listener_Thread] UDP listener thread stopped\n");
 	return 0;
 }
 void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* sender) {
@@ -202,13 +202,13 @@ void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* se
 		const char* separator = strchr(payload, '|');
 
 		if (separator == nullptr) {
-			printf("[FSM] Invalid OK message from %s: %s\n", peerIP, data);
+			printf("[UDP_FSM] Invalid OK message from %s: %s\n", peerIP, data);
 			return;
 		}
 		
 		size_t senderLen = static_cast<size_t>(separator - payload);
 		if (senderLen >= BUFFER_SIZE) {
-			printf("[FSM] OK sender name too long from %s\n", peerIP);
+			printf("[UDP_FSM] OK sender name too long from %s\n", peerIP);
 			return;
 		}
 		// Extract sender and target names
@@ -225,33 +225,35 @@ void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* se
 		strcpy(content, senderName);
 	}
 	else {
+		//ignore own alive messages
+		if (strcmp(data, username) == 0) {
+			//printf("[FSM] Ignoring own ALIVE message from %s\n", peerIP);
+			return;
+		}
 		// Assume it's an ALIVE message with just the username
 		msgType = MSG_UDP_ALIVE_RECEIVED;
 		strcpy(content, data);
-		printf("[FSM] Detected ALIVE message from %s, username: %s\n", peerIP, content);
+		printf("[UDP_FSM] Detected ALIVE message from %s, username: %s\n", peerIP, content);
 	}
-
-	if (strcmp(content, username) == 0) {
+	//ignore own messages
+	if (strcmp(content, username) == 0) {	
 		//printf("[FSM] Ignoring own message from %s\n", peerIP);
 		return;
 	}
 
-	// THREAD-SAFE: Use critical section or call handler directly
-	// For some reason, posting messages to FSM from another thread causes issues.
-	// Call the handler directly since we're on the listener thread
-	if (msgType == MSG_UDP_ALIVE_RECEIVED) {
-		// Call SendOk directly with the peer info
-		SendOkDirect(content, peerIP);
-	}
-	else if (msgType == MSG_UDP_OK_RECEIVED) {
-		// Call GotOk directly with the peer info
-		GotOkDirect(content, peerIP);
-	}
+	//UDP message is valid and not from us, prepare FSM message	
+	PrepareNewMessage(0x00,msgType);
+	SetMsgToAutomate(UDP_FSM);
+	SetMsgObjectNumberTo(0);
+	AddParam(PARAM_USERNAME, (uint16)strlen(content), (uint8*)content);
+	AddParam(PARAM_IP_ADDRESS, (uint16)strlen(peerIP), (uint8*)peerIP);
+	SendMessage(UDP_MB);
+	
 }
 void DeviceSearch::SendOk() {
 	// Send UDP OK response, create a new thread for a new fsm instance (each connection will have a new thread)
 	//then wait for syn, send ack, etc.
-	printf("[%d] SendOk called\n", GetObjectId());
+	printf("[UDP_FSM] SendOk called\n");
 	uint8* usernameParam = GetParam(PARAM_USERNAME);
 	uint8* ipParam = GetParam(PARAM_IP_ADDRESS);
 
@@ -271,7 +273,7 @@ void DeviceSearch::SendOk() {
 
 	SOCKET udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (udpSocket == INVALID_SOCKET) {
-		printf("[%d] Failed to create socket for OK response\n", GetObjectId());
+		printf("[UDP_FSM] Failed to create socket for OK response\n");
 		return;
 	}
 
@@ -288,18 +290,18 @@ void DeviceSearch::SendOk() {
 	//sleep a bit to avoid message clumping
 	Sleep(100);
 	if (sendResult == SOCKET_ERROR) {
-		printf("[%d] Failed to send OK: %d\n", GetObjectId(), WSAGetLastError());
+		printf("[UDP_FSM] Failed to send OK: %d\n", WSAGetLastError());
 	}
 	else {
-		printf("[%d] OK sent to %s (%s)\n", GetObjectId(), peerUsername, peerIP);
+		printf("[UDP_FSM] OK sent to %s (%s)\n", peerUsername, peerIP);
 	}
 
 	closesocket(udpSocket);
 }
 void DeviceSearch::GotOk() {
-	// Got OK respons, create a new thread for a new fsm instance (each connection will have a new thread)
+	// Got OK response, create a new thread for a new fsm instance (each connection will have a new thread)
 	//then send a syn, wait for ack, etc.
-	printf("[%d] GotOk called\n", GetObjectId());
+	printf("[UDP_FSM] GotOk called\n");
 	uint8* usernameParam = GetParam(PARAM_USERNAME);
 	uint8* ipParam = GetParam(PARAM_IP_ADDRESS);
 
@@ -312,74 +314,37 @@ void DeviceSearch::GotOk() {
 	memcpy(peerIP, ipParam + 4, ipParam[2]);
 	peerIP[ipParam[2]] = '\0';
 
-	printf("[%d] Received OK response from %s (%s)\n", GetObjectId(), peerUsername, peerIP);
+	printf("[UDP_FSM] Received OK response from %s (%s)\n", peerUsername, peerIP);
 	createConnectionInstance(peerIP, peerUsername, 1);
 }
 
-//FSMSystem TCP_connection_sys(10 /* max number of automates types */, 1 /* max number of msg boxes */);
-DWORD WINAPI TCPConnectionThread(void* data) {
-	TCPComs* pAutomate = new TCPComs();
-	
-	printf("[TCP Thread] Adding TCP automate to existing system...\n");
-	
-	// Add automate to an existing slot (uses the other Add overload)
-	Client_sys.Add(pAutomate, TCP_FSM);  // No numOfObjects parameter!
-	
-	// Start automate
-	pAutomate->Start();
-	
-	return 0;
-}
+
+
+extern HANDLE hFsmMutex;
 void DeviceSearch::createConnectionInstance(const char* peerIP, const char* peerUsername, bool server) {
-	printf("[%d] Creating TCP connection for %s (%s)\n",
-		GetObjectId(), peerUsername, peerIP);
+	printf("[UDP_FSM] Requesting TCP connection for %s (%s)\n", peerUsername, peerIP);
 
-	// Create new TCP FSM on heap
-	TCPComs* pTcpFsm = new TCPComs();
-	pTcpFsm->SetPeerInfo(peerIP, peerUsername, server);
+	/* To be truly thread-safe, we send a message to the TCP_FSM mailbox.
+	   The kernel will then deliver this to one of the TCPComs instances
+	   that is currently in an 'IDLE' or 'INITIAL' state.
+	*/
 
-	// Add to system (system will manage it) - use the overload for adding to existing type
-	Client_sys.Add(pTcpFsm, TCP_FSM);
+	//can use mutex for for building message from the UDP thread, if new client connections are frequent
+	//WaitForSingleObject(hFsmMutex, INFINITE);
 
-	// Start the FSM (Initialize is called by Add)
-	pTcpFsm->Start();
+	PrepareNewMessage(0x00, MSG_TCP_THREAD_START); // Reuse your existing msg type or create a new one
+	SetMsgToAutomate(TCP_FSM);
+	SetMsgObjectNumberTo(0xffffffff);
+	AddParam(PARAM_USERNAME, (uint16)strlen(peerUsername), (uint8*)peerUsername);
+	AddParam(PARAM_IP_ADDRESS, (uint16)strlen(peerIP), (uint8*)peerIP);
 
+	// You could add a param for 'server' status here
+	uint8 isServer = server ? 1 : 0;
+	//this param indicates if this automate is server or client
+	//indicates if this automate is server or client1 for server, 0 for client
+	AddParam(IS_SERVER_PARAM, 1, &isServer);
+	SendMessage(TCP_MB);
 
+	//ReleaseMutex(hFsmMutex);
 }
 
-void DeviceSearch::SendOkDirect(const char* peerUsername, const char* peerIP) {
-	struct sockaddr_in broadcastAddr;
-	broadcastAddr.sin_family = AF_INET;
-	broadcastAddr.sin_addr.s_addr = inet_addr(CLIENT_ADDRESS);
-	broadcastAddr.sin_port = htons(SERVER_PORT);
-
-	SOCKET udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (udpSocket == INVALID_SOCKET) {
-		printf("[%d] Failed to create socket for OK response\n", GetObjectId());
-		return;
-	}
-
-	int broadcast = 1;
-	setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST,
-		(char*)&broadcast, sizeof(broadcast));
-
-	char okMessage[BUFFER_SIZE];
-	sprintf(okMessage, "OK|%s|%s", username, peerUsername);
-
-	int sendResult = sendto(udpSocket, okMessage, strlen(okMessage), 0,
-		(struct sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
-
-	if (sendResult == SOCKET_ERROR) {
-		printf("[%d] Failed to send OK: %d\n", GetObjectId(), WSAGetLastError());
-	}
-	else {
-		printf("[%d] OK sent to %s (%s)\n", GetObjectId(), peerUsername, peerIP);
-	}
-
-	closesocket(udpSocket);
-}
-
-void DeviceSearch::GotOkDirect(const char* peerUsername, const char* peerIP) {
-	printf("[%d] Received OK response from %s (%s)\n", GetObjectId(), peerUsername, peerIP);
-	createConnectionInstance(peerIP, peerUsername, true);
-}

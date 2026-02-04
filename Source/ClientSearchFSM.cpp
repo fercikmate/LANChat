@@ -14,9 +14,6 @@
 
 extern char username[BUFFER_SIZE];
 
-// Make UDP_sys accessible (extern or pass as parameter)
-extern FSMSystem Client_sys;
-
 DeviceSearch::DeviceSearch() : FiniteStateMachine(UDP_FSM, UDP_MB, 10, 10, 10) {
 
 }
@@ -64,15 +61,16 @@ void DeviceSearch::Initialize() {
 extern char username[BUFFER_SIZE];
 void DeviceSearch::Start() {
 	
-	// Send UDP ALIVE message with username
+	
 	StartUDPListening();
-
+	// Send UDP ALIVE message with username
 	SendUdpBroadcast();
 
 	SetState(IDLE);
 }
 extern int myTcpPort;
 void DeviceSearch::SendUdpBroadcast() {
+	//msg struct is "ALIVE|username|tcpPort"
 	struct sockaddr_in broadcastAddr;
 	broadcastAddr.sin_family = AF_INET;
 	broadcastAddr.sin_addr.s_addr = inet_addr("255.255.255.255");
@@ -97,6 +95,7 @@ void DeviceSearch::SendUdpBroadcast() {
 }
 
 void DeviceSearch::StartUDPListening() {
+	//create a thread to listen for UDP messages
 	struct sockaddr_in servAddr;
 	memset(&servAddr, 0, sizeof(servAddr));
 	servAddr.sin_family = AF_INET;
@@ -178,7 +177,7 @@ void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* se
 	char peerUsername[BUFFER_SIZE];
 	uint16 peerTcpPort = 8081; // fallback port, shouldnt have to be used
 
-	// 1. Check if it is an OK message: "OK|senderUsername|targetUsername|port"
+	// Check if it is an OK message: "OK|senderUsername|targetUsername|port"
 	if (strncmp(buffer, "OK|", 3) == 0) {
 		msgType = MSG_UDP_OK_RECEIVED;
 
@@ -207,7 +206,7 @@ void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* se
 			peerTcpPort = (uint16)atoi(portPtr + 1); // Convert port string to integer
 		}
 	}
-		// 2. Otherwise, assume it's an ALIVE message: "username|port"
+		// Assume it's an ALIVE message: "username|port"
 		else {
 			msgType = MSG_UDP_ALIVE_RECEIVED;
 
@@ -238,7 +237,6 @@ void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* se
 		AddParam(PARAM_USERNAME, (uint16)strlen(peerUsername), (uint8*)peerUsername);
 		AddParam(PARAM_IP_ADDRESS, (uint16)strlen(peerIP), (uint8*)peerIP);
 
-		// IMPORTANT: Add the port as a parameter so the TCP FSM knows where to connect
 		AddParam(PARAM_PORT, 2, (uint8*)&peerTcpPort);
 
 		SendMessage(UDP_MB);
@@ -273,7 +271,7 @@ void DeviceSearch::SendOk() {
 		return;
 	}
 
-	// Format: "OK|username"
+	// Format: "OK|username|port"
 	int broadcast = 1;
 	setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST,
 		(char*)&broadcast, sizeof(broadcast));
@@ -346,6 +344,7 @@ void DeviceSearch::createConnectionInstance(const char* peerIP, const char* peer
 }
 void DeviceSearch::SendUserInput(const char* text) {
 	// Loop through all 10 possible TCP instances in the pool
+	// The kernel actually sends it to the first free instance
 	for (int i = 0; i < 10; i++) {
 		PrepareNewMessage(0x00, MSG_USER_INPUT);
 		SetMsgToAutomate(TCP_FSM);

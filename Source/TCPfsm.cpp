@@ -59,7 +59,7 @@ void TCPComs::Initialize() {
 
 	SetState(IDLE);
 
-	// 2. Register the handler for the wake-up message sent from createConnectionInstance
+	//  Register the handler for the wake-up message sent from createConnectionInstance
 	InitEventProc(IDLE, MSG_TCP_THREAD_START, (PROC_FUN_PTR)&TCPComs::ProcessConnectionRequest);
 	InitEventProc(CONNECTED, MSG_USER_INPUT, (PROC_FUN_PTR)&TCPComs::HandleSendData);
 }
@@ -100,7 +100,7 @@ void TCPComs::ProcessConnectionRequest() {
 	hConnectionThread = ::CreateThread(
 		NULL, 0,
 		ConnectionWorkerThread,
-		this, // Pass 'this' so the thread can access class members
+		this, 
 		0, &dwConnectionThreadID
 	);
 
@@ -192,12 +192,9 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 		int bytesRecv = recv(pThis->m_tcpSocket, recvBuf, BUFFER_SIZE - 1, 0);
 		if (bytesRecv > 0) {
 			recvBuf[bytesRecv] = '\0';
-
-			// OPTION A: Print directly to terminal
 			printf("\n[TCP_THREAD] Message from user [%s]: %s\n> ", pThis->m_peerUsername, recvBuf);
 
-			// OPTION B: Send a message to the FSM to handle logic (like saving to a log)
-			// pThis->PrepareNewMessage(...) -> SendMessage(TCP_MB)
+			
 		}
 		else {
 			printf("[TCP_THREAD] %s connection closed: %d\n", pThis->m_peerUsername,WSAGetLastError());
@@ -209,9 +206,8 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 }
 
 void TCPComs::ConnectionClosed() {
-	// Cleanup...
 	SetState(IDLE);
-	FreeFSM();  // Return to free pool
+	FreeFSM();  // Return to the thread free pool
 }
 void TCPComs::SendMSG(){
 	//function to send messages over TCP

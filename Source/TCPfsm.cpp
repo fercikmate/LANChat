@@ -71,7 +71,7 @@ void TCPComs::Connecting() {
 }
 
 void TCPComs::ProcessConnectionRequest() {
-	printf("[TCP_FSM] Processing request. Spawning worker thread...\n");
+	//printf("[TCP_FSM] Processing request. Spawning worker thread...\n");
 	
 	// Extract parameters from the message
 	uint8* userParam = GetParam(PARAM_USERNAME);
@@ -109,7 +109,7 @@ void TCPComs::ProcessConnectionRequest() {
 DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 	TCPComs* pThis = (TCPComs*)param; //pointer to our object
 
-	printf("[TCP_Thread] Worker started for %s.\n", pThis->m_peerUsername);
+	//printf("[TCP_Thread] Worker started for %s.\n", pThis->m_peerUsername);
 
 	// Create the TCP socket first
 	pThis->m_tcpSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -125,8 +125,8 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 
 	// If Server, Listen. If Client, Connect
 	if (pThis->m_isServer) {
-		printf("[TCP_Thread] Setting up server for %s at %s at port %d...\n",
-			pThis->m_peerUsername, pThis->m_peerIP, pThis->m_peerPort);
+		/*printf("[TCP_Thread] Setting up server for %s at %s at port %d...\n",
+			pThis->m_peerUsername, pThis->m_peerIP, pThis->m_peerPort);*/
 
 		// Bind to any address on the TCP port
 		sockaddr_in serverAddr;
@@ -144,6 +144,7 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 			pThis->m_tcpSocket = INVALID_SOCKET;
 			return -1;
 		}
+		Sleep(100); // Sleep a bit to ensure the port is properly released if recently used
 
 		if (listen(pThis->m_tcpSocket, SOMAXCONN) == SOCKET_ERROR) {
 			printf("[TCP_Thread] listen failed: %d\n", WSAGetLastError());
@@ -162,14 +163,15 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 			return -1;
 		}
 		
-		printf("[TCP_Thread] Accepted connection from %s:%d for user %s!\n", pThis->m_peerIP,pThis->m_peerPort, pThis->m_peerUsername);
+		printf("[TCP_Thread] Accepted connection from %s:%d for user %s!\n\n", pThis->m_peerIP,pThis->m_peerPort, pThis->m_peerUsername);
 		// Store the client socket for communication
 		closesocket(pThis->m_tcpSocket); // Close listener
 		pThis->m_tcpSocket = clientSock; // Use client socket for communication
 	}
 	else {
 		// Connect logic
-		printf("[TCP_Thread] Connecting to server %s at %s:%d...\n",
+
+		printf("[TCP_Thread] Connecting to user %s at %s:%d...\n\n",
 		pThis->m_peerUsername, pThis->m_peerIP, pThis->m_peerPort);
 		
 
@@ -180,7 +182,7 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 			return -1;
 		}
 		
-		printf("[TCP_Thread] Connected to server %s!\n", pThis->m_peerUsername);
+		printf("[TCP_Thread] Connected to user %s!\n\n", pThis->m_peerUsername);
 	}
 
 	// Update state safely or just start the send/recv loop here.
@@ -192,13 +194,13 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 			recvBuf[bytesRecv] = '\0';
 
 			// OPTION A: Print directly to terminal
-			printf("\n[%s]: %s\n> ", pThis->m_peerUsername, recvBuf);
+			printf("\n[TCP_THREAD] Message from user [%s]: %s\n> ", pThis->m_peerUsername, recvBuf);
 
 			// OPTION B: Send a message to the FSM to handle logic (like saving to a log)
 			// pThis->PrepareNewMessage(...) -> SendMessage(TCP_MB)
 		}
 		else {
-			printf("[System] Connection closed.\n");
+			printf("[TCP_THREAD] %s connection closed: %d\n", pThis->m_peerUsername,WSAGetLastError());
 			break;
 		}
 	}
@@ -233,4 +235,11 @@ void TCPComs::HandleSendData() {
 			printf("[TCP] Send failed: %d\n", WSAGetLastError());
 		}
 	}
+}
+void TCPComs::SetPeerInfo(const char* ip, const char* name, bool server) {
+	strncpy(this->m_peerIP, ip, 15);
+	this->m_peerIP[15] = '\0';
+	strncpy(this->m_peerUsername, name, BUFFER_SIZE - 1);
+	this->m_peerUsername[BUFFER_SIZE - 1] = '\0';
+	this->m_isServer = server;
 }

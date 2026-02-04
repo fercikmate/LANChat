@@ -220,15 +220,17 @@ void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* se
 			*pipePtr = '\0';
 			strcpy(peerUsername, buffer);
 			peerTcpPort = (uint16)atoi(pipePtr + 1); // Convert port string to integer
-
-			printf("[UDP_FSM] Detected ALIVE from %s, User: %s, Port: %d\n", peerIP, peerUsername, peerTcpPort);
+			// Ignore ALIVE messages from ourselves
+			if (strcmp(peerUsername, username) == 0) return;
+			
+			printf("\n[UDP_FSM] Detected ALIVE from %s, User: %s, Port: %d\n", peerIP, peerUsername, peerTcpPort);
 		}
 
-		// 3. Ignore messages from ourselves
+		
 		if (strcmp(peerUsername, username) == 0) return;
 
 
-		// 4. Prepare and send the FSM message
+		//  Prepare and send the FSM message
 		PrepareNewMessage(0x00, msgType);
 		SetMsgToAutomate(UDP_FSM);
 		SetMsgObjectNumberTo(0);

@@ -73,7 +73,7 @@ private:
 	void SendMSG();
 	void ReceiveMSG();
 	void HandleSendData();
-
+	void SetPeerInfo(const char* ip, const char* username, bool isServer);
 
 public:
 	TCPComs();
@@ -83,14 +83,6 @@ public:
 	void GetUsername();
 	void Start();
 	void Connecting();
-
-	void SetPeerInfo(const char* ip, const char* username, bool isServer) {
-		strcpy(m_peerIP, ip);
-		strcpy(m_peerUsername, username);
-		m_isServer = isServer;
-		printf("[TCP_FSM] TCP FSM configured: %s (%s), server=%d\n",
-			m_peerUsername, m_peerIP, m_isServer);
-	}
 
 
 };

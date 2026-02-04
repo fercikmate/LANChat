@@ -34,11 +34,11 @@ int initializeWSA() {
 
 /* FSM system instance. */
 FSMSystem Client_sys(2 /* max number of automates types */, 2 /* max number of msg boxes */);
-
+DeviceSearch udpAutomate;
+TCPComs tcpPool[10];
 
 DWORD WINAPI SystemThread(void* data) {
-	DeviceSearch udpAutomate;
-	TCPComs tcpPool[10];
+	
 
 	const uint8 buffClassNo = 4;
 	uint32 buffsCount[buffClassNo] = { 50, 50, 50, 10 };
@@ -66,13 +66,64 @@ DWORD WINAPI SystemThread(void* data) {
 	return 0;
 }
 
+DWORD WINAPI ConsoleInputThread(LPVOID param) {
+	char inputBuffer[BUFFER_SIZE];
+	while (true) {
+		if (fgets(inputBuffer, BUFFER_SIZE, stdin)) {
+			inputBuffer[strcspn(inputBuffer, "\n")] = 0;
+
+			// Simple and clean: let the object handle its own messaging
+			WaitForSingleObject(hFsmMutex, INFINITE);
+			udpAutomate.SendUserInput(inputBuffer);
+			ReleaseMutex(hFsmMutex);
+		}
+	}
+	return 0;
+}
 char username[BUFFER_SIZE];
+int myTcpPort = 8081;
+int getUsername() {
+	printf("[UDP_FSM] DeviceSearch::Start() called\n");
+
+	// LOGIN - Get username from user
+	printf("===========================\n");
+	printf("Welcome! Enter your username: \n");
+	printf("===========================\n");
+
+	if (fgets(username, BUFFER_SIZE, stdin) == NULL) {
+		printf("[UDP_FSM] Error reading username\n");
+		return -1;
+	}
+
+	// Remove newline character if present
+	size_t len = strlen(username);
+	if (len > 0 && username[len - 1] == '\n') {
+		username[len - 1] = '\0';
+		len--;
+	}
+
+	// Check if username is empty	
+	if (len == 0) {
+		printf("[UDP_FSM] Username cannot be empty\n");
+		return -1;
+	}
+
+	printf("[UDP_FSM] Username set to: %s\n", username);
+	
+	for (int i = 0; username[i] != '\0'; i++) myTcpPort += username[i];
+	return 0;
+}
 
 int main()
 {	
 	//Initialize WSA
 	if (initializeWSA() == -1) {	
 		printf("Press a button to exit the application due to WSAStartup failure.\n");
+		char ch = _getch();
+		return -1;
+	}
+	if (getUsername() == -1) {
+		printf("Press a button to exit the application due to invalid username.\n");
 		char ch = _getch();
 		return -1;
 	}
@@ -83,6 +134,13 @@ int main()
 	/* Start operating thread - FSM handles everything */
 	thread_handle = CreateThread(NULL, 0, SystemThread, NULL, 0, &thread_id);
 
+	HANDLE hConsole = CreateThread(NULL, 0, ConsoleInputThread, NULL, 0, NULL);
+	if (hConsole == NULL) {
+		printf("[!] Failed to start Console Thread\n");
+	}
+
+	// Keep main thread alive
+	while (true) { Sleep(1000); }
 	/* Wait for the FSM thread to complete (it runs indefinitely) */
 
 	WaitForSingleObject(thread_handle, INFINITE);

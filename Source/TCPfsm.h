@@ -52,6 +52,7 @@ private:
 	bool m_isServer;
 	char m_peerIP[16];
 	char m_peerUsername[BUFFER_SIZE];
+	uint16 m_peerPort;
 	
 	// Add these for the connection worker thread:
 	HANDLE hConnectionThread;
@@ -69,7 +70,9 @@ private:
 	void StartTCPListening();
 	void ProcessConnectionRequest();
 	void ConnectionClosed();
-	
+	void SendMSG();
+	void ReceiveMSG();
+	void HandleSendData();
 
 
 public:

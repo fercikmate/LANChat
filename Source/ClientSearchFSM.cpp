@@ -60,38 +60,9 @@ void DeviceSearch::Initialize() {
 	
 }
 
-/* Initial system message */
-void DeviceSearch::GetUsername() {	
-	
-}
 
+extern char username[BUFFER_SIZE];
 void DeviceSearch::Start() {
-	printf("[UDP_FSM] DeviceSearch::Start() called\n");
-	
-	// LOGIN - Get username from user
-	printf("===========================\n");
-	printf("Welcome! Enter your username: \n");
-	printf("===========================\n");
-
-	if (fgets(username, BUFFER_SIZE, stdin) == NULL) {
-		printf("[UDP_FSM] Error reading username\n");
-		return;
-	}
-
-	// Remove newline character if present
-	size_t len = strlen(username);
-	if (len > 0 && username[len - 1] == '\n') {
-		username[len - 1] = '\0';
-		len--;
-	}
-
-	// Check if username is empty	
-	if (len == 0) {
-		printf("[UDP_FSM] Username cannot be empty\n");
-		return;
-	}
-
-	printf("[UDP_FSM] Username set to: %s\n", username);
 	
 	// Send UDP ALIVE message with username
 	StartUDPListening();
@@ -100,12 +71,14 @@ void DeviceSearch::Start() {
 
 	SetState(IDLE);
 }
-
+extern int myTcpPort;
 void DeviceSearch::SendUdpBroadcast() {
 	struct sockaddr_in broadcastAddr;
 	broadcastAddr.sin_family = AF_INET;
 	broadcastAddr.sin_addr.s_addr = inet_addr("255.255.255.255");
 	broadcastAddr.sin_port = htons(SERVER_PORT);
+
+	
 
 	SOCKET udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
@@ -113,10 +86,13 @@ void DeviceSearch::SendUdpBroadcast() {
 	setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST,
 		(char*)&broadcast, sizeof(broadcast));
 
-	sendto(udpSocket, username, strlen(username), 0,
+	char payload[BUFFER_SIZE];
+	sprintf(payload, "%s|%d", username, myTcpPort);
+
+	sendto(udpSocket, payload, strlen(payload), 0,
 		(struct sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
 
-	printf("[UDP_FSM] Broadcast ALIVE sent with username: %s\n",username);
+	printf("[UDP_FSM] Broadcast ALIVE sent with username: %s\n", payload);
 	closesocket(udpSocket);
 }
 
@@ -189,65 +165,81 @@ DWORD WINAPI DeviceSearch::UdpListenerThread(LPVOID param) {
 	return 0;
 }
 void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* sender) {
+	char buffer[BUFFER_SIZE];
+	// Ensure we don't overflow and null-terminate the incoming raw data
+	int copyLen = (length < BUFFER_SIZE) ? length : BUFFER_SIZE - 1;
+	memcpy(buffer, data, copyLen);
+	buffer[copyLen] = '\0';
+
 	char peerIP[16];
 	strcpy(peerIP, inet_ntoa(sender->sin_addr));
+
 	uint16 msgType;
-	char content[BUFFER_SIZE];
+	char peerUsername[BUFFER_SIZE];
+	uint16 peerTcpPort = 8081; // fallback port, shouldnt have to be used
 
-	if (strncmp(data, "OK|", 3) == 0) {
+	// 1. Check if it is an OK message: "OK|senderUsername|targetUsername|port"
+	if (strncmp(buffer, "OK|", 3) == 0) {
 		msgType = MSG_UDP_OK_RECEIVED;
-		char senderName[BUFFER_SIZE];
-		char targetName[BUFFER_SIZE];
-		const char* payload = data + 3;
-		const char* separator = strchr(payload, '|');
 
-		if (separator == nullptr) {
-			printf("[UDP_FSM] Invalid OK message from %s: %s\n", peerIP, data);
-			return;
-		}
-		
-		size_t senderLen = static_cast<size_t>(separator - payload);
-		if (senderLen >= BUFFER_SIZE) {
-			printf("[UDP_FSM] OK sender name too long from %s\n", peerIP);
-			return;
-		}
-		// Extract sender and target names
-		strncpy(senderName, payload, senderLen);
-		senderName[senderLen] = '\0';
-		strncpy(targetName, separator + 1, BUFFER_SIZE - 1);
-		targetName[BUFFER_SIZE - 1] = '\0';
+		char* senderPart = buffer + 3;          // Move past "OK|"
+		char* pipePtr = strchr(senderPart, '|'); // Find separator between sender and target
+		// If no pipe found, invalid format, ignore
+		if (pipePtr == nullptr) return;
 
-		if (strcmp(targetName, username) != 0) {
-			//printf("[FSM] OK message not for us (%s), ignoring\n", targetName);
-			return;
-		}
-		//Its for us->content
-		strcpy(content, senderName);
-	}
-	else {
-		//ignore own alive messages
-		if (strcmp(data, username) == 0) {
-			//printf("[FSM] Ignoring own ALIVE message from %s\n", peerIP);
-			return;
-		}
-		// Assume it's an ALIVE message with just the username
-		msgType = MSG_UDP_ALIVE_RECEIVED;
-		strcpy(content, data);
-		printf("[UDP_FSM] Detected ALIVE message from %s, username: %s\n", peerIP, content);
-	}
-	//ignore own messages
-	if (strcmp(content, username) == 0) {	
-		//printf("[FSM] Ignoring own message from %s\n", peerIP);
-		return;
-	}
+		*pipePtr = '\0';
+		char* targetPart = pipePtr + 1;
 
-	//UDP message is valid and not from us, prepare FSM message	
-	PrepareNewMessage(0x00,msgType);
-	SetMsgToAutomate(UDP_FSM);
-	SetMsgObjectNumberTo(0);
-	AddParam(PARAM_USERNAME, (uint16)strlen(content), (uint8*)content);
-	AddParam(PARAM_IP_ADDRESS, (uint16)strlen(peerIP), (uint8*)peerIP);
-	SendMessage(UDP_MB);
+		char* pipe2 = strchr(targetPart, '|');
+		if (pipe2 != nullptr) {
+			*pipe2 = '\0'; // Null terminate targetUsername so strcmp works
+			peerTcpPort = (uint16)atoi(pipe2 + 1);
+		}
+		// Verify this OK message was meant for us
+		if (strcmp(targetPart, username) != 0) {
+			return;
+		}
+
+		strcpy(peerUsername, senderPart);
+		//get port if present
+		char* portPtr = strchr(targetPart, '|');
+		if (portPtr != nullptr) {
+			peerTcpPort = (uint16)atoi(portPtr + 1); // Convert port string to integer
+		}
+	}
+		// 2. Otherwise, assume it's an ALIVE message: "username|port"
+		else {
+			msgType = MSG_UDP_ALIVE_RECEIVED;
+
+			char* pipePtr = strchr(buffer, '|');
+			if (pipePtr == nullptr) {
+				// If no pipe is found, it's either old format or invalid
+				return;
+			}
+
+			*pipePtr = '\0';
+			strcpy(peerUsername, buffer);
+			peerTcpPort = (uint16)atoi(pipePtr + 1); // Convert port string to integer
+
+			printf("[UDP_FSM] Detected ALIVE from %s, User: %s, Port: %d\n", peerIP, peerUsername, peerTcpPort);
+		}
+
+		// 3. Ignore messages from ourselves
+		if (strcmp(peerUsername, username) == 0) return;
+
+
+		// 4. Prepare and send the FSM message
+		PrepareNewMessage(0x00, msgType);
+		SetMsgToAutomate(UDP_FSM);
+		SetMsgObjectNumberTo(0);
+
+		AddParam(PARAM_USERNAME, (uint16)strlen(peerUsername), (uint8*)peerUsername);
+		AddParam(PARAM_IP_ADDRESS, (uint16)strlen(peerIP), (uint8*)peerIP);
+
+		// IMPORTANT: Add the port as a parameter so the TCP FSM knows where to connect
+		AddParam(PARAM_PORT, 2, (uint8*)&peerTcpPort);
+
+		SendMessage(UDP_MB);
 	
 }
 void DeviceSearch::SendOk() {
@@ -256,6 +248,8 @@ void DeviceSearch::SendOk() {
 	printf("[UDP_FSM] SendOk called\n");
 	uint8* usernameParam = GetParam(PARAM_USERNAME);
 	uint8* ipParam = GetParam(PARAM_IP_ADDRESS);
+	uint8* portParam = GetParam(PARAM_PORT);
+	uint16 actualPort = *(uint16*)(portParam + 4);
 
 	char peerUsername[BUFFER_SIZE];
 	char peerIP[16];
@@ -283,7 +277,7 @@ void DeviceSearch::SendOk() {
 		(char*)&broadcast, sizeof(broadcast));
 
 	char okMessage[BUFFER_SIZE];
-	sprintf(okMessage, "OK|%s|%s", username, peerUsername);
+	sprintf(okMessage, "OK|%s|%s|%d", username, peerUsername, myTcpPort);
 
 	int sendResult = sendto(udpSocket, okMessage, strlen(okMessage), 0,
 		(struct sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
@@ -294,7 +288,7 @@ void DeviceSearch::SendOk() {
 	}
 	else {
 		printf("[UDP_FSM] OK sent to %s (%s)\n", peerUsername, peerIP);
-		createConnectionInstance(peerIP, peerUsername, 0);
+		createConnectionInstance(peerIP, peerUsername, actualPort, 0);
 	}
 
 	closesocket(udpSocket);
@@ -305,6 +299,8 @@ void DeviceSearch::GotOk() {
 	printf("[UDP_FSM] GotOk called\n");
 	uint8* usernameParam = GetParam(PARAM_USERNAME);
 	uint8* ipParam = GetParam(PARAM_IP_ADDRESS);
+	uint8* portParam = GetParam(PARAM_PORT);
+	uint16 actualPort = *(uint16*)(portParam + 4);
 
 	char peerUsername[BUFFER_SIZE];
 	char peerIP[16];
@@ -316,19 +312,16 @@ void DeviceSearch::GotOk() {
 	peerIP[ipParam[2]] = '\0';
 
 	printf("[UDP_FSM] Received OK response from %s (%s)\n", peerUsername, peerIP);
-	createConnectionInstance(peerIP, peerUsername, 1);
+	createConnectionInstance(peerIP, peerUsername, actualPort, 1);
 }
 
 
 
 extern HANDLE hFsmMutex;
-void DeviceSearch::createConnectionInstance(const char* peerIP, const char* peerUsername, bool server) {
+void DeviceSearch::createConnectionInstance(const char* peerIP, const char* peerUsername,uint16 port, bool server) {
 	printf("[UDP_FSM] Requesting TCP connection for %s (%s)\n", peerUsername, peerIP);
 
-	/* To be truly thread-safe, we send a message to the TCP_FSM mailbox.
-	   The kernel will then deliver this to one of the TCPComs instances
-	   that is currently in an 'IDLE' or 'INITIAL' state.
-	*/
+	/* send a message to the TCP_FSM mailbox.*/
 
 	//can use mutex for for building message from the UDP thread, if new client connections are frequent
 	//WaitForSingleObject(hFsmMutex, INFINITE);
@@ -338,6 +331,7 @@ void DeviceSearch::createConnectionInstance(const char* peerIP, const char* peer
 	SetMsgObjectNumberTo(0xffffffff);
 	AddParam(PARAM_USERNAME, (uint16)strlen(peerUsername), (uint8*)peerUsername);
 	AddParam(PARAM_IP_ADDRESS, (uint16)strlen(peerIP), (uint8*)peerIP);
+	AddParam(PARAM_PORT, 2, (uint8*)&port);
 
 	// You could add a param for 'server' status here
 	uint8 isServer = server ? 1 : 0;
@@ -347,5 +341,15 @@ void DeviceSearch::createConnectionInstance(const char* peerIP, const char* peer
 	SendMessage(TCP_MB);
 
 	//ReleaseMutex(hFsmMutex);
+}
+void DeviceSearch::SendUserInput(const char* text) {
+	// Loop through all 10 possible TCP instances in the pool
+	for (int i = 0; i < 10; i++) {
+		PrepareNewMessage(0x00, MSG_USER_INPUT);
+		SetMsgToAutomate(TCP_FSM);
+		SetMsgObjectNumberTo(i); // Send to instance i
+		AddParam(PARAM_DATA, (uint16)strlen(text), (uint8*)text);
+		FiniteStateMachine::SendMessage(TCP_MB);
+	}
 }
 

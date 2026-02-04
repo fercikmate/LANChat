@@ -7,11 +7,11 @@
 #include "TCPfsm.h"
 
 #define CLIENT_ADDRESS "255.255.255.255"
-#define SERVER_PORT 8080
-#define TCP_PORT 8081  // Separate port for TCP connections
+
+
 
 extern char username[BUFFER_SIZE];
-
+extern int myTcpPort;
 TCPComs::TCPComs() : FiniteStateMachine(TCP_FSM, TCP_MB, 10, 10, 10),
 	m_tcpSocket(INVALID_SOCKET),
 	ListenerThread(NULL),
@@ -56,11 +56,12 @@ void TCPComs::NoFreeInstances() {
 }
 
 void TCPComs::Initialize() {
+
 	SetState(IDLE);
 
 	// 2. Register the handler for the wake-up message sent from createConnectionInstance
 	InitEventProc(IDLE, MSG_TCP_THREAD_START, (PROC_FUN_PTR)&TCPComs::ProcessConnectionRequest);
-
+	InitEventProc(CONNECTED, MSG_USER_INPUT, (PROC_FUN_PTR)&TCPComs::HandleSendData);
 }
 void TCPComs::Start() {
 	printf("[TCP_FSM] TCPComs::Start() called\n");
@@ -71,16 +72,19 @@ void TCPComs::Connecting() {
 
 void TCPComs::ProcessConnectionRequest() {
 	printf("[TCP_FSM] Processing request. Spawning worker thread...\n");
-
-	// 1. Extract params from the message
+	
+	// Extract parameters from the message
 	uint8* userParam = GetParam(PARAM_USERNAME);
 	uint8* ipParam = GetParam(PARAM_IP_ADDRESS);
 	uint8* serverParam = GetParam(IS_SERVER_PARAM);
+	uint8* portParam = GetParam(PARAM_PORT);
+	this->m_peerPort = *(uint16*)(portParam + 4);
+	// printf("[TCP_FSM] Requested port: %d\n", this->m_peerPort);
 
 	char pName[BUFFER_SIZE];
 	char pIP[16];
 
-	// Offset 4 is typical for this kernel's parameter data alignment
+	//4 bytes before actual data starts
 	memcpy(pName, userParam + 4, userParam[2]);
 	pName[userParam[2]] = '\0';
 
@@ -89,11 +93,10 @@ void TCPComs::ProcessConnectionRequest() {
 
 	bool isServer = (serverParam[4] == 1);
 
-	// 2. Configure this specific instance
+	//this specific instance
 	SetPeerInfo(pIP, pName, isServer);
 
-	// 3. SPAWN THE THREAD!
-	// This gives you a different thread so the kernel can continue processing.
+	// thread spawn
 	hConnectionThread = ::CreateThread(
 		NULL, 0,
 		ConnectionWorkerThread,
@@ -101,7 +104,7 @@ void TCPComs::ProcessConnectionRequest() {
 		0, &dwConnectionThreadID
 	);
 
-	// 4. Return IMMEDIATELY so the Kernel can handle other messages!
+	
 }
 DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 	TCPComs* pThis = (TCPComs*)param; //pointer to our object
@@ -117,18 +120,18 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 
 	sockaddr_in addr;
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(TCP_PORT);  
+	addr.sin_port = htons(pThis->m_peerPort);  
 	addr.sin_addr.s_addr = inet_addr(pThis->m_peerIP);
 
 	// If Server, Listen. If Client, Connect
 	if (pThis->m_isServer) {
-		printf("[TCP_Thread] Setting up server for %s at %s...\n",
-			pThis->m_peerUsername, pThis->m_peerIP);
+		printf("[TCP_Thread] Setting up server for %s at %s at port %d...\n",
+			pThis->m_peerUsername, pThis->m_peerIP, pThis->m_peerPort);
 
 		// Bind to any address on the TCP port
 		sockaddr_in serverAddr;
 		serverAddr.sin_family = AF_INET;
-		serverAddr.sin_port = htons(TCP_PORT);  
+		serverAddr.sin_port = htons(myTcpPort);  
 		serverAddr.sin_addr.s_addr = INADDR_ANY;
 
 		int reuse = 1;
@@ -149,7 +152,7 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 			return -1;
 		}
 
-		printf("[TCP_Thread] Listening for incoming connections for %s on port %d...\n", pThis->m_peerUsername, TCP_PORT);
+		printf("[TCP_Thread] Listening for incoming connections for %s on port %d...\n", pThis->m_peerUsername, myTcpPort);
 
 		SOCKET clientSock = accept(pThis->m_tcpSocket, NULL, NULL);
 		if (clientSock == INVALID_SOCKET) {
@@ -159,7 +162,7 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 			return -1;
 		}
 		
-		printf("[TCP_Thread] Accepted connection from %s for %s!\n", pThis->m_peerIP, pThis->m_peerUsername);
+		printf("[TCP_Thread] Accepted connection from %s:%d for user %s!\n", pThis->m_peerIP,pThis->m_peerPort, pThis->m_peerUsername);
 		// Store the client socket for communication
 		closesocket(pThis->m_tcpSocket); // Close listener
 		pThis->m_tcpSocket = clientSock; // Use client socket for communication
@@ -167,7 +170,7 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 	else {
 		// Connect logic
 		printf("[TCP_Thread] Connecting to server %s at %s:%d...\n",
-		pThis->m_peerUsername, pThis->m_peerIP, TCP_PORT);
+		pThis->m_peerUsername, pThis->m_peerIP, pThis->m_peerPort);
 		
 
 		if (connect(pThis->m_tcpSocket, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
@@ -182,7 +185,24 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 
 	// Update state safely or just start the send/recv loop here.
 	pThis->SetState(CONNECTED);
+	char recvBuf[BUFFER_SIZE];
+	while (true) {
+		int bytesRecv = recv(pThis->m_tcpSocket, recvBuf, BUFFER_SIZE - 1, 0);
+		if (bytesRecv > 0) {
+			recvBuf[bytesRecv] = '\0';
 
+			// OPTION A: Print directly to terminal
+			printf("\n[%s]: %s\n> ", pThis->m_peerUsername, recvBuf);
+
+			// OPTION B: Send a message to the FSM to handle logic (like saving to a log)
+			// pThis->PrepareNewMessage(...) -> SendMessage(TCP_MB)
+		}
+		else {
+			printf("[System] Connection closed.\n");
+			break;
+		}
+	}
+	
 	return 0;
 }
 
@@ -190,4 +210,27 @@ void TCPComs::ConnectionClosed() {
 	// Cleanup...
 	SetState(IDLE);
 	FreeFSM();  // Return to free pool
+}
+void TCPComs::SendMSG(){
+	//function to send messages over TCP
+
+}
+void TCPComs::ReceiveMSG(){
+	//function to receive messages over TCP
+}
+void TCPComs::HandleSendData() {
+	//get data from param and send over TCP socket
+	uint8* dataParam = GetParam(PARAM_DATA);
+
+	if (dataParam && m_tcpSocket != INVALID_SOCKET) {
+		// Offset 4 is where the actual string starts in this kernel's Param format
+		char* text = (char*)(dataParam + 4);
+
+		// Send it over the actual TCP socket
+		int result = send(m_tcpSocket, text, strlen(text), 0);
+
+		if (result == SOCKET_ERROR) {
+			printf("[TCP] Send failed: %d\n", WSAGetLastError());
+		}
+	}
 }

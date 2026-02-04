@@ -6,7 +6,7 @@
 
 
 
-
+#define SERVER_PORT 8080
 #define UDP_MB	0
 #define UDP_FSM	0
 #define BUFFER_SIZE 512
@@ -52,7 +52,7 @@ private:
 	void SendUdpBroadcast();
 	void StartUDPListening();
 	DWORD WINAPI ConnectionThread(void* data);
-	void createConnectionInstance(const char* peerIP, const char* peerUsername, bool server);
+	void createConnectionInstance(const char* peerIP, const char* peerUsername, uint16 port, bool server);
 	void SendOkDirect(const char* peerUsername, const char* peerIP);
 	void GotOkDirect(const char* peerUsername, const char* peerIP);
 
@@ -63,7 +63,7 @@ public:
 	void Initialize();
 	void GetUsername();
 	void Start();
-
+	void SendUserInput(const char* text);
 	
 
 };

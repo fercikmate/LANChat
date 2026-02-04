@@ -11,7 +11,13 @@
 
 extern char username[BUFFER_SIZE];
 
-TCPComs::TCPComs() : FiniteStateMachine(TCP_FSM, TCP_MB, 10, 10, 10) {
+TCPComs::TCPComs() : FiniteStateMachine(TCP_FSM, TCP_MB, 10, 10, 10),
+	m_tcpSocket(INVALID_SOCKET),
+	ListenerThread(NULL),
+	ThreadID(0),
+	m_isServer(false) {
+	m_peerIP[0] = '\0';
+	m_peerUsername[0] = '\0';
 }
 
 TCPComs::~TCPComs() {

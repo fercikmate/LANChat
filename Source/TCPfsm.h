@@ -7,8 +7,8 @@
 
 
 
-#define TCP_MB	0
-#define TCP_FSM	0
+#define TCP_MB	1
+#define TCP_FSM	1
 #define BUFFER_SIZE 512
 
 #define MSG_TCP_ALIVE_RECEIVED  0x0001
@@ -42,6 +42,9 @@ private:
 	SOCKET m_tcpSocket;
 	HANDLE ListenerThread;
 	DWORD ThreadID;
+	char m_peerIP[16];
+	char m_peerUsername[BUFFER_SIZE];
+	bool m_isServer;
 	static DWORD WINAPI TCPListenerThread(LPVOID param);
 	void TCPMsg_2_FSMMsg(const char* data, int length, sockaddr_in* sender);
 	void CreateThread();
@@ -61,6 +64,13 @@ public:
 	void Start();
 	void Connecting();
 
+	void SetPeerInfo(const char* ip, const char* username, bool isServer) {
+		strcpy(m_peerIP, ip);
+		strcpy(m_peerUsername, username);
+		m_isServer = isServer;
+		printf("[%d] TCP FSM configured: %s (%s), server=%d\n",
+			GetObjectId(), m_peerUsername, m_peerIP, m_isServer);
+	}
 
 
 };

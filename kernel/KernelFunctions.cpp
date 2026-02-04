@@ -4,7 +4,7 @@
 #ifdef __MICRO_CONTROLER_MEMORY_ACCESS__
 
 void SetUint16(uint8 *addr, uint16 value) {
-  addr[0] = (uint8) value;
+   addr[0] = (uint8) value;
   addr[1] = (uint8)(value >> 8);
 }
 

@@ -9,6 +9,7 @@
 #include <conio.h>
 #include "ClientSearchFSM.h"
 #include "../kernel/logFile.h"
+#include "TCPfsm.h"
 
 
 #pragma comment (lib, "Ws2_32.lib")
@@ -32,10 +33,11 @@ int initializeWSA() {
 }
 
 /* FSM system instance. */
-static FSMSystem UDP_sys(1 /* max number of automates types */, 1 /* max number of msg boxes */);
+FSMSystem Client_sys(2 /* max number of automates types */, 2 /* max number of msg boxes */);
 
 DWORD WINAPI SystemThread(void* data) {
-	DeviceSearch automate;
+	DeviceSearch udpAutomate; //initialize UDP automate
+	TCPComs tcpAutomate;  //initialize TCP automate
 
 	/* Kernel buffer description block */
 	/* number of buffer types */
@@ -51,16 +53,19 @@ DWORD WINAPI SystemThread(void* data) {
 
 	/* Mandatory kernel initialization */
 	printf("[*] Initializing system...\n");
-	UDP_sys.InitKernel(buffClassNo, buffsCount, buffsLength, 5);
+	Client_sys.InitKernel(buffClassNo, buffsCount, buffsLength, 5);
 
-	/* Add automates to the system */
-	UDP_sys.Add(&automate, UDP_FSM , 1 /* the number of automates that will be added */, true);
+	/* Add UDP automate - type 0 */
+	Client_sys.Add(&udpAutomate, UDP_FSM, 1, true);
+	
+	/* Initialize TCP automate type with maximum of 10 slots */
+	Client_sys.Add(&tcpAutomate, TCP_FSM, 10, true);
 
 	/* Start the first automate - handles login, UDP alive, and server setup */
-	automate.Start();
+	udpAutomate.Start();
 
 	
-	UDP_sys.Start();
+	Client_sys.Start();
 
 	/* Finish thread */
 	return 0;

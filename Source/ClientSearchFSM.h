@@ -51,7 +51,8 @@ private:
 	void StartUDPListening();
 	DWORD WINAPI ConnectionThread(void* data);
 	void createConnectionInstance(const char* peerIP, const char* peerUsername, bool server);
-
+	void SendOkDirect(const char* peerUsername, const char* peerIP);
+	void GotOkDirect(const char* peerUsername, const char* peerIP);
 
 public:
 	DeviceSearch();

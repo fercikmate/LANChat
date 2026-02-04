@@ -5,6 +5,9 @@
 #include <string.h>
 #include <winsock2.h>
 #include "ClientSearchFSM.h"
+#include "../kernel/LogFile.h"
+#include "TCPfsm.h"
+
 
 #define CLIENT_ADDRESS "255.255.255.255"
 #define SERVER_PORT 8080
@@ -49,7 +52,8 @@ void DeviceSearch::NoFreeInstances() {
 void DeviceSearch::Initialize() {
 	SetState(LOGIN);
 	InitEventProc(IDLE, MSG_UDP_ALIVE_RECEIVED, (PROC_FUN_PTR)&DeviceSearch::SendOk);
-	InitEventProc(IDLE, MSG_UDP_OK_RECEIVED, (PROC_FUN_PTR)&DeviceSearch::GotOk);	
+	InitEventProc(IDLE, MSG_UDP_OK_RECEIVED, (PROC_FUN_PTR)&DeviceSearch::GotOk);
+	
 }
 
 /* Initial system message */
@@ -87,7 +91,7 @@ void DeviceSearch::Start() {
 	
 	// Send UDP ALIVE message with username
 	StartUDPListening();
-	Sleep(1000);
+
 	SendUdpBroadcast();
 
 	SetState(IDLE);
@@ -236,7 +240,7 @@ void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* se
 		// Don't process self messages
 	//	printf("[FSM] Ignoring message from self: %s\n", content);
 		return;
-		return;
+		
 	}
 	// Create FSM message with the data
 	PrepareNewMessage(0x00, msgType);
@@ -308,5 +312,46 @@ void DeviceSearch::GotOk() {
 	peerIP[ipParam[2]] = '\0';
 
 	printf("[%d] Received OK response from %s (%s)\n", GetObjectId(), peerUsername, peerIP);
+	createConnectionInstance(peerIP, peerUsername, 1);
+}
 
+static FSMSystem TCP_connection_sys(10 /* max number of automates types */, 1 /* max number of msg boxes */);
+DWORD WINAPI TCPConnectionThread(void* data) {
+	TCPComs automate;
+
+	/* Kernel buffer description block */
+	/* number of buffer types */
+	const uint8 buffClassNo = 4;
+	/* number of buffers of each buffer type */
+	uint32 buffsCount[buffClassNo] = { 50, 50, 50, 10 };
+	/* buffer size for each buffer type */
+	uint32 buffsLength[buffClassNo] = { 128, 256, 512, 1024 };
+
+	///* Logging setting - to a file in this case */
+	//LogFile lf("log.log" /*log file name*/, "./log.ini" /* message translator file */);
+	//LogAutomateNew::SetLogInterface(&lf);
+
+	/* Mandatory kernel initialization */
+	printf("[*] Initializing system...\n");
+	TCP_connection_sys.InitKernel(buffClassNo, buffsCount, buffsLength, 5);
+
+	/* Add automates to the system */
+	TCP_connection_sys.Add(&automate, UDP_FSM, 1 /* the number of automates that will be added */, true);
+
+	/* Start the first automate*/
+	automate.Start();
+
+
+	TCP_connection_sys.Start();
+
+	/* Finish thread */
+	return 0;
+}
+void DeviceSearch::createConnectionInstance(const char* peerIP, const char* peerUsername, bool server) {
+	// Create a new thread for TCP connection FSM
+	DWORD threadID;
+	HANDLE threadHandle = ::CreateThread(
+		NULL, 0, TCPConnectionThread, NULL, server, &threadID);
+
+	
 }

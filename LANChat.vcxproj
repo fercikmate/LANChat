@@ -157,6 +157,7 @@
     <ClCompile Include="kernel\UdpLogInterface.cpp" />
     <ClCompile Include="Source\ClientSearchFSM.cpp" />
     <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\TCPfsm.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="kernel\buffers.h" />
@@ -190,6 +191,7 @@
     <ClInclude Include="kernel\UdpLogInterface.h" />
     <ClInclude Include="kernel\uniSock.h" />
     <ClInclude Include="Source\ClientSearchFSM.h" />
+    <ClInclude Include="Source\TCPfsm.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="kernel\KernelLib.lib" />

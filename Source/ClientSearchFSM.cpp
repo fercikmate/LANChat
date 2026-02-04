@@ -294,6 +294,7 @@ void DeviceSearch::SendOk() {
 	}
 	else {
 		printf("[UDP_FSM] OK sent to %s (%s)\n", peerUsername, peerIP);
+		createConnectionInstance(peerIP, peerUsername, 0);
 	}
 
 	closesocket(udpSocket);

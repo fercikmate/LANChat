@@ -8,6 +8,7 @@
 
 #define CLIENT_ADDRESS "255.255.255.255"
 #define SERVER_PORT 8080
+#define TCP_PORT 8081  // Separate port for TCP connections
 
 extern char username[BUFFER_SIZE];
 
@@ -15,7 +16,9 @@ TCPComs::TCPComs() : FiniteStateMachine(TCP_FSM, TCP_MB, 10, 10, 10),
 	m_tcpSocket(INVALID_SOCKET),
 	ListenerThread(NULL),
 	dwListenerThreadID(0),
-	m_isServer(false) {
+	m_isServer(false),
+	hConnectionThread(NULL),
+	dwConnectionThreadID(0) {
 	m_peerIP[0] = '\0';
 	m_peerUsername[0] = '\0';
 }
@@ -103,38 +106,80 @@ void TCPComs::ProcessConnectionRequest() {
 DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 	TCPComs* pThis = (TCPComs*)param; //pointer to our object
 
-	printf("[TCP_Thread] Worker started for %s. I can block here!\n", pThis->m_peerUsername);
+	printf("[TCP_Thread] Worker started for %s.\n", pThis->m_peerUsername);
 
-	
-	// If Server, Listen. If Client, Connect.
+	// Create the TCP socket first
+	pThis->m_tcpSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (pThis->m_tcpSocket == INVALID_SOCKET) {
+		printf("[TCP_Thread] socket creation failed: %d\n", WSAGetLastError());
+		return -1;
+	}
+
+	sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(TCP_PORT);  
+	addr.sin_addr.s_addr = inet_addr(pThis->m_peerIP);
+
+	// If Server, Listen. If Client, Connect
 	if (pThis->m_isServer) {
-		// Setup socket, bind, listen, accept...
-		printf("[TCP_Thread] Listening for incoming connections for %s at %s...\n",
+		printf("[TCP_Thread] Setting up server for %s at %s...\n",
 			pThis->m_peerUsername, pThis->m_peerIP);
-		
+
+		// Bind to any address on the TCP port
+		sockaddr_in serverAddr;
+		serverAddr.sin_family = AF_INET;
+		serverAddr.sin_port = htons(TCP_PORT);  
+		serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+		int reuse = 1;
+		setsockopt(pThis->m_tcpSocket, SOL_SOCKET, SO_REUSEADDR,
+			(char*)&reuse, sizeof(reuse));
+
+		if (bind(pThis->m_tcpSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+			printf("[TCP_Thread] bind failed: %d\n", WSAGetLastError());
+			closesocket(pThis->m_tcpSocket);
+			pThis->m_tcpSocket = INVALID_SOCKET;
+			return -1;
+		}
+
+		if (listen(pThis->m_tcpSocket, SOMAXCONN) == SOCKET_ERROR) {
+			printf("[TCP_Thread] listen failed: %d\n", WSAGetLastError());
+			closesocket(pThis->m_tcpSocket);
+			pThis->m_tcpSocket = INVALID_SOCKET;
+			return -1;
+		}
+
+		printf("[TCP_Thread] Listening for incoming connections for %s on port %d...\n", pThis->m_peerUsername, TCP_PORT);
+
 		SOCKET clientSock = accept(pThis->m_tcpSocket, NULL, NULL);
 		if (clientSock == INVALID_SOCKET) {
 			printf("[TCP_Thread] accept failed: %d\n", WSAGetLastError());
+			closesocket(pThis->m_tcpSocket);
+			pThis->m_tcpSocket = INVALID_SOCKET;
 			return -1;
 		}
-		printf("[TCP_Thread] Accepted connection from %s for %s!\n", pThis->m_peerIP, pThis->m_peerUsername);
-
 		
-
-		// Blocking Accept example:
-		// SOCKET clientSock = accept(pThis->m_tcpSocket, ...);
+		printf("[TCP_Thread] Accepted connection from %s for %s!\n", pThis->m_peerIP, pThis->m_peerUsername);
+		// Store the client socket for communication
+		closesocket(pThis->m_tcpSocket); // Close listener
+		pThis->m_tcpSocket = clientSock; // Use client socket for communication
 	}
 	else {
 		// Connect logic
+		printf("[TCP_Thread] Connecting to server %s at %s:%d...\n",
+		pThis->m_peerUsername, pThis->m_peerIP, TCP_PORT);
 		
-		printf("[TCP_Thread] Connecting to server %s at %s...\n",
-		pThis->m_peerUsername, pThis->m_peerIP);
-		connect(pThis->m_tcpSocket, NULL, 0);
+
+		if (connect(pThis->m_tcpSocket, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
+			printf("[TCP_Thread] connect failed: %d\n", WSAGetLastError());
+			closesocket(pThis->m_tcpSocket);
+			pThis->m_tcpSocket = INVALID_SOCKET;
+			return -1;
+		}
+		
 		printf("[TCP_Thread] Connected to server %s!\n", pThis->m_peerUsername);
-		// connect(pThis->m_tcpSocket, ...);
 	}
 
-	
 	// Update state safely or just start the send/recv loop here.
 	pThis->SetState(CONNECTED);
 

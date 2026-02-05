@@ -193,14 +193,17 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 		if (bytesRecv > 0) {
 			recvBuf[bytesRecv] = '\0';
 			printf("\n[TCP_THREAD] Message from user [%s]: %s\n> ", pThis->m_peerUsername, recvBuf);
-
-			
 		}
 		else {
-			printf("[TCP_THREAD] %s connection closed: %d\n", pThis->m_peerUsername,WSAGetLastError());
+			printf("[TCP_THREAD] %s connection closed: %d\n", pThis->m_peerUsername, WSAGetLastError());
 			break;
 		}
 	}
+	
+	// cleanup after connection closes
+	closesocket(pThis->m_tcpSocket);
+	pThis->m_tcpSocket = INVALID_SOCKET;
+	pThis->SetState(IDLE);
 	
 	return 0;
 }
@@ -218,6 +221,11 @@ void TCPComs::ReceiveMSG(){
 }
 void TCPComs::HandleSendData() {
 	//get data from param and send over TCP socket
+
+	//check if we're connected before trying to send
+	if (GetState() != CONNECTED) {
+		return;  // Silently ignore if not connected
+	}
 	uint8* dataParam = GetParam(PARAM_DATA);
 
 	if (dataParam && m_tcpSocket != INVALID_SOCKET) {

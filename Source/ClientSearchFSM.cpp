@@ -260,6 +260,11 @@ void DeviceSearch::SendOk() {
 	memcpy(peerIP, ipParam + 4, ipParam[2]);
 	peerIP[ipParam[2]] = '\0';
 
+	if (ConnectionExistsForPeer(peerUsername, peerIP)) {
+		printf("[UDP_FSM] Connection to %s (%s) already exists, skipping.\n",
+			peerUsername, peerIP);
+		return;
+	}
 	struct sockaddr_in broadcastAddr;
 	broadcastAddr.sin_family = AF_INET;
 	broadcastAddr.sin_addr.s_addr = inet_addr(CLIENT_ADDRESS);
@@ -270,7 +275,9 @@ void DeviceSearch::SendOk() {
 		printf("[UDP_FSM] Failed to create socket for OK response\n");
 		return;
 	}
+	
 
+	printf("[UDP_FSM] Requesting TCP connection for %s (%s)\n", peerUsername, peerIP);
 	// Format: "OK|username|port"
 	int broadcast = 1;
 	setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST,
@@ -288,7 +295,7 @@ void DeviceSearch::SendOk() {
 	}
 	else {
 		printf("[UDP_FSM] OK sent to %s (%s)\n", peerUsername, peerIP);
-		createConnectionInstance(peerIP, peerUsername, actualPort, 0);
+		createConnectionInstance(peerIP, peerUsername, actualPort, 1);
 	}
 
 	closesocket(udpSocket);
@@ -311,8 +318,10 @@ void DeviceSearch::GotOk() {
 	memcpy(peerIP, ipParam + 4, ipParam[2]);
 	peerIP[ipParam[2]] = '\0';
 
+	
+
 	printf("[UDP_FSM] Received OK response from %s (%s)\n", peerUsername, peerIP);
-	createConnectionInstance(peerIP, peerUsername, actualPort, 1);
+	createConnectionInstance(peerIP, peerUsername, actualPort, 0);
 }
 
 
@@ -353,4 +362,25 @@ void DeviceSearch::SendUserInput(const char* text) {
 		FiniteStateMachine::SendMessage(TCP_MB);
 	}
 }
+
+
+#include "TCPfsm.h"
+
+extern TCPComs* tcpInstances;  // pool of TCP FSM instances
+extern int tcpInstanceCount;
+
+bool ConnectionExistsForPeer(const char* username, const char* ip) {
+    // Iterate through all TCP FSM instances
+    for (int i = 0; i < tcpInstanceCount; i++) {
+        if (tcpInstances[i].IsConnectedToPeer()) {
+            // Check if this instance is already connected to this peer
+            if (strcmp(tcpInstances[i].GetPeerUsername(), username) == 0 &&
+                strcmp(tcpInstances[i].GetPeerIP(), ip) == 0) {
+                return true;  // Connection already exists
+            }
+        }
+    }
+    return false;
+}
+
 

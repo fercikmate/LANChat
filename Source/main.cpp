@@ -36,6 +36,8 @@ int initializeWSA() {
 FSMSystem Client_sys(2 /* max number of automates types */, 2 /* max number of msg boxes */);
 DeviceSearch udpAutomate;
 TCPComs tcpPool[10];
+TCPComs* tcpInstances = tcpPool;
+int tcpInstanceCount = 10;
 
 DWORD WINAPI SystemThread(void* data) {
 	

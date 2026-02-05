@@ -70,10 +70,9 @@ private:
 	void StartTCPListening();
 	void ProcessConnectionRequest();
 	void ConnectionClosed();
-	void SendMSG();
-	void ReceiveMSG();
 	void HandleSendData();
-	void SetPeerInfo(const char* ip, const char* username, bool isServer);
+	
+
 
 public:
 	TCPComs();
@@ -83,6 +82,16 @@ public:
 	void GetUsername();
 	void Start();
 	void Connecting();
+	void SendMSG();
+	void ReceiveMSG();
 
+	void SetPeerInfo(const char* ip, const char* username, bool isServer);
 
+	// Public accessors for checking existing connections
+	const char* GetPeerUsername() const { return m_peerUsername; }
+	const char* GetPeerIP() const { return m_peerIP; }
+	bool IsConnectedToPeer() { return (m_tcpSocket != INVALID_SOCKET && GetState() == CONNECTED); }
 };
+
+// Helper function to check if connection exists (declare in header or a separate manager)
+bool ConnectionExistsForPeer(const char* username, const char* ip);

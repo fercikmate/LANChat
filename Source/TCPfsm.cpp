@@ -175,8 +175,28 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 		pThis->m_peerUsername, pThis->m_peerIP, pThis->m_peerPort);
 		
 
-		if (connect(pThis->m_tcpSocket, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
-			printf("[TCP_Thread] connect failed: %d\n", WSAGetLastError());
+		int retries = 0;
+		const int MAX_RETRIES = 5;
+		
+		while (retries < MAX_RETRIES) {
+			if (connect(pThis->m_tcpSocket, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
+				int err = WSAGetLastError();
+				if (err == 10061) { // Connection refused - server not ready yet
+					retries++;
+					printf("[TCP_Thread] Connection refused, retry %d/%d...\n", retries, MAX_RETRIES);
+					Sleep(500); // Wait 500ms before retry
+					continue;
+				}
+				printf("[TCP_Thread] connect failed: %d\n", err);
+				closesocket(pThis->m_tcpSocket);
+				pThis->m_tcpSocket = INVALID_SOCKET;
+				return -1;
+			}
+			break; // Connected successfully
+		}
+		
+		if (retries >= MAX_RETRIES) {
+			printf("[TCP_Thread] Failed to connect after %d retries\n", MAX_RETRIES);
 			closesocket(pThis->m_tcpSocket);
 			pThis->m_tcpSocket = INVALID_SOCKET;
 			return -1;

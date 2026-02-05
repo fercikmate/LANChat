@@ -6,7 +6,6 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <stdio.h>
-#include <conio.h>
 #include "ClientSearchFSM.h"
 #include "../kernel/logFile.h"
 #include "TCPfsm.h"
@@ -68,20 +67,7 @@ DWORD WINAPI SystemThread(void* data) {
 	return 0;
 }
 
-DWORD WINAPI ConsoleInputThread(LPVOID param) {
-	char inputBuffer[BUFFER_SIZE];
-	while (true) {
-		if (fgets(inputBuffer, BUFFER_SIZE, stdin)) {
-			inputBuffer[strcspn(inputBuffer, "\n")] = 0;
 
-			// Simple and clean: let the object handle its own messaging
-			WaitForSingleObject(hFsmMutex, INFINITE);
-			udpAutomate.SendUserInput(inputBuffer);
-			ReleaseMutex(hFsmMutex);
-		}
-	}
-	return 0;
-}
 char username[BUFFER_SIZE];
 int myTcpPort = 8081;
 
@@ -94,11 +80,6 @@ int main()
 		char ch = _getch();
 		return -1;
 	}
-	if (DeviceSearch::getUsername() == -1) {
-		printf("Press a button to exit the application due to invalid username.\n");
-		char ch = _getch();
-		return -1;
-	}
 
 	DWORD thread_id;
 	HANDLE thread_handle;
@@ -106,10 +87,6 @@ int main()
 	/* Start operating thread - FSM handles everything */
 	thread_handle = CreateThread(NULL, 0, SystemThread, NULL, 0, &thread_id);
 
-	HANDLE hConsole = CreateThread(NULL, 0, ConsoleInputThread, NULL, 0, NULL);
-	if (hConsole == NULL) {
-		printf("[!] Failed to start Console Thread\n");
-	}
 
 	// Keep main thread alive
 	while (true) { Sleep(1000); }

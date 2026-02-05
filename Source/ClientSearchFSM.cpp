@@ -14,7 +14,12 @@
 
 extern char username[BUFFER_SIZE];
 
-DeviceSearch::DeviceSearch() : FiniteStateMachine(UDP_FSM, UDP_MB, 10, 10, 10) {
+DeviceSearch::DeviceSearch() : FiniteStateMachine(UDP_FSM, UDP_MB, 10, 10, 10),
+	m_udpSocket(INVALID_SOCKET),
+	ListenerThread(NULL),
+	ThreadID(0),
+	m_retryCount(0),
+	m_consoleThreadStarted(false) {
 
 }
 
@@ -54,18 +59,24 @@ void DeviceSearch::Initialize() {
 	SetState(LOGIN);
 	InitEventProc(IDLE, MSG_UDP_ALIVE_RECEIVED, (PROC_FUN_PTR)&DeviceSearch::SendOk);
 	InitEventProc(IDLE, MSG_UDP_OK_RECEIVED, (PROC_FUN_PTR)&DeviceSearch::GotOk);
-	
+	InitEventProc(IDLE, TIMER1_EXPIRED, (PROC_FUN_PTR)&DeviceSearch::OnTimerExpired);
+	InitTimerBlock(TIMER1_ID, TIMER1_COUNT, TIMER1_EXPIRED);
 }
 
 
 extern char username[BUFFER_SIZE];
 void DeviceSearch::Start() {
-	
+	printf("[UDP_FSM] DeviceSearch::Start() called\n");
+	if (getUsername() == -1) {
+		printf("Press a button to exit the application due to invalid username.\n");
+		char ch = _getch();
+		return;
+	}
 	
 	StartUDPListening();
 	// Send UDP ALIVE message with username
 	SendUdpBroadcast();
-
+	
 	SetState(IDLE);
 }
 extern int myTcpPort;
@@ -89,6 +100,10 @@ void DeviceSearch::SendUdpBroadcast() {
 
 	sendto(udpSocket, payload, strlen(payload), 0,
 		(struct sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
+	//safety stop
+	StopTimer(TIMER1_ID);
+	StartTimer(TIMER1_ID);
+
 
 	printf("[UDP_FSM] Broadcast ALIVE sent with username: %s\n", payload);
 	closesocket(udpSocket);
@@ -129,7 +144,7 @@ void DeviceSearch::StartUDPListening() {
 }
 
 DWORD WINAPI DeviceSearch::UdpListenerThread(LPVOID param) {
-	DeviceSearch* pParent = (DeviceSearch*)param; //param is 'this' DeviceSearch instance
+	DeviceSearch* pParent = (DeviceSearch*)param;
 	char buffer[BUFFER_SIZE];
 	sockaddr_in senderAddr;
 	int senderAddrLen = sizeof(senderAddr);
@@ -140,7 +155,6 @@ DWORD WINAPI DeviceSearch::UdpListenerThread(LPVOID param) {
 		memset(buffer, 0, BUFFER_SIZE);
 		memset(&senderAddr, 0, sizeof(senderAddr));
 
-		// Receive UDP message - leave room for null terminator
 		int recvLen = recvfrom(pParent->m_udpSocket, buffer, BUFFER_SIZE - 1, 0,
 			(struct sockaddr*)&senderAddr, &senderAddrLen);
 
@@ -151,11 +165,16 @@ DWORD WINAPI DeviceSearch::UdpListenerThread(LPVOID param) {
 
 		if (recvLen > 0) {
 			buffer[recvLen] = '\0';
+			
+			// Stop timer if its ok message-> connecting soon
+			if (strncmp(buffer, "OK|", 3) == 0) {
+				pParent->StopTimer(TIMER1_ID);
+			}
+			
 			// Convert network message to FSM message
 			pParent->UdpMsg_2_FSMMsg(buffer, recvLen, &senderAddr);
 		}
 		else {
-			// No data received, continue listening
 			Sleep(100);
 		}
 	}
@@ -295,6 +314,12 @@ void DeviceSearch::SendOk() {
 	}
 	else {
 		printf("[UDP_FSM] OK sent to %s (%s)\n", peerUsername, peerIP);
+		//check if console thread is already started
+		if (!m_consoleThreadStarted) {
+			m_consoleThreadStarted = true;
+			::CreateThread(NULL, 0, ConsoleInputThread, (LPVOID)this, 0, NULL);
+			printf("[UDP_FSM] Username confirmed, chat enabled.\n");
+		}
 		createConnectionInstance(peerIP, peerUsername, actualPort, 1);
 	}
 
@@ -318,7 +343,12 @@ void DeviceSearch::GotOk() {
 	memcpy(peerIP, ipParam + 4, ipParam[2]);
 	peerIP[ipParam[2]] = '\0';
 
-	
+	//check if console thread is already started
+	if (!m_consoleThreadStarted) {
+		m_consoleThreadStarted = true;
+		::CreateThread(NULL, 0, ConsoleInputThread, (LPVOID)this, 0, NULL);
+		printf("[UDP_FSM] Username confirmed, chat enabled.\n");
+	}
 
 	printf("[UDP_FSM] Received OK response from %s (%s)\n", peerUsername, peerIP);
 	createConnectionInstance(peerIP, peerUsername, actualPort, 0);
@@ -351,20 +381,6 @@ void DeviceSearch::createConnectionInstance(const char* peerIP, const char* peer
 
 	//ReleaseMutex(hFsmMutex);
 }
-void DeviceSearch::SendUserInput(const char* text) {
-	// Loop through all 10 possible TCP instances in the pool
-	// The kernel actually sends it to the first free instance
-	for (int i = 0; i < 10; i++) {
-		PrepareNewMessage(0x00, MSG_USER_INPUT);
-		SetMsgToAutomate(TCP_FSM);
-		SetMsgObjectNumberTo(i); // Send to instance i
-		AddParam(PARAM_DATA, (uint16)strlen(text), (uint8*)text);
-		FiniteStateMachine::SendMessage(TCP_MB);
-	}
-}
-
-
-#include "TCPfsm.h"
 
 extern TCPComs* tcpInstances; 
 extern int tcpInstanceCount;
@@ -383,7 +399,7 @@ bool ConnectionExistsForPeer(const char* username, const char* ip) {
     return false;
 }
 int DeviceSearch::getUsername() {
-	printf("[UDP_FSM] DeviceSearch::Start() called\n");
+	
 
 	// LOGIN - Get username from user
 	printf("===========================\n");
@@ -412,5 +428,40 @@ int DeviceSearch::getUsername() {
 
 	for (int i = 0; username[i] != '\0'; i++) myTcpPort += username[i];
 	return 0;
-}
 
+}
+DWORD WINAPI DeviceSearch::ConsoleInputThread(LPVOID param) {
+	DeviceSearch* pThis = (DeviceSearch*)param;
+	char inputBuffer[BUFFER_SIZE];
+	while (true) {
+		if (fgets(inputBuffer, BUFFER_SIZE, stdin)) {
+			inputBuffer[strcspn(inputBuffer, "\n")] = 0;
+
+			//mutex to safely build message from console thread
+			WaitForSingleObject(hFsmMutex, INFINITE);
+
+			for (int i = 0; i < 10; i++) {
+				pThis->PrepareNewMessage(0x00, MSG_USER_INPUT);
+				pThis->SetMsgToAutomate(TCP_FSM);
+				pThis->SetMsgObjectNumberTo(i);
+				pThis->AddParam(PARAM_DATA, (uint16)strlen(inputBuffer), (uint8*)inputBuffer);
+				pThis->SendMessage(TCP_MB);
+			}
+			ReleaseMutex(hFsmMutex);
+		}
+	}
+	return 0;
+}
+void DeviceSearch::OnTimerExpired() {
+	m_retryCount++;
+
+		// assume we're alone OR username is taken
+		printf("[UDP_FSM] No response after %d seconds. Enter new username:\n", TIMER1_COUNT);
+		m_retryCount = 0;
+
+		if (getUsername() == -1) {
+			printf("Invalid name.\n");
+			return;
+		}
+		SendUdpBroadcast();
+}

@@ -3,6 +3,7 @@
 #include "../kernel/fsmSystem.h"
 #include "../kernel/stdMsgpc16pl16.h"
 #include "../kernel/TransportInterface.h"
+#include <conio.h>
 
 
 
@@ -17,7 +18,10 @@
 #define MSG_UDP_CONNECTED       0x0004
 #define MSG_UDP_MESSAGE         0x0005
 
-
+//timer resolution is 1 second, so TIMER1_COUNT of 10 means 10 seconds
+#define TIMER1_ID 0
+#define TIMER1_COUNT 15 
+#define TIMER1_EXPIRED 0x20 
 
 #define PARAM_USERNAME      0x01
 #define PARAM_IP_ADDRESS    0x02
@@ -40,6 +44,7 @@ enum DeviceSearchStates { LOGIN, IDLE };
 	uint8	GetAutomate();
 
 
+
 private:
 	SOCKET m_udpSocket;
 	HANDLE ListenerThread;
@@ -55,7 +60,10 @@ private:
 	void createConnectionInstance(const char* peerIP, const char* peerUsername, uint16 port, bool server);
 	void SendOkDirect(const char* peerUsername, const char* peerIP);
 	void GotOkDirect(const char* peerUsername, const char* peerIP);
-
+	static DWORD WINAPI ConsoleInputThread(LPVOID param);
+	void OnTimerExpired();
+	int m_retryCount;           // Track retry attempts
+	bool m_consoleThreadStarted; // Flag to start console thread only once
 public:
 	DeviceSearch();
 	~DeviceSearch();
@@ -68,3 +76,4 @@ public:
 	
 
 };
+

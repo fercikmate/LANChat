@@ -200,7 +200,7 @@ void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* se
 		}
 
 		strcpy(peerUsername, senderPart);
-		//get port if present
+		//get port 
 		char* portPtr = strchr(targetPart, '|');
 		if (portPtr != nullptr) {
 			peerTcpPort = (uint16)atoi(portPtr + 1); // Convert port string to integer
@@ -344,8 +344,8 @@ void DeviceSearch::createConnectionInstance(const char* peerIP, const char* peer
 
 	// You could add a param for 'server' status here
 	uint8 isServer = server ? 1 : 0;
-	//this param indicates if this automate is server or client
-	//indicates if this automate is server or client1 for server, 0 for client
+	
+	//indicates if this automate is server or client 1 for server, 0 for client
 	AddParam(IS_SERVER_PARAM, 1, &isServer);
 	SendMessage(TCP_MB);
 
@@ -366,7 +366,7 @@ void DeviceSearch::SendUserInput(const char* text) {
 
 #include "TCPfsm.h"
 
-extern TCPComs* tcpInstances;  // pool of TCP FSM instances
+extern TCPComs* tcpInstances; 
 extern int tcpInstanceCount;
 
 bool ConnectionExistsForPeer(const char* username, const char* ip) {
@@ -382,5 +382,35 @@ bool ConnectionExistsForPeer(const char* username, const char* ip) {
     }
     return false;
 }
+int DeviceSearch::getUsername() {
+	printf("[UDP_FSM] DeviceSearch::Start() called\n");
 
+	// LOGIN - Get username from user
+	printf("===========================\n");
+	printf("Welcome! Enter your username: \n");
+	printf("===========================\n");
+
+	if (fgets(username, BUFFER_SIZE, stdin) == NULL) {
+		printf("[UDP_FSM] Error reading username\n");
+		return -1;
+	}
+
+	// Remove newline character if present
+	size_t len = strlen(username);
+	if (len > 0 && username[len - 1] == '\n') {
+		username[len - 1] = '\0';
+		len--;
+	}
+
+	// Check if username is empty	
+	if (len == 0) {
+		printf("[UDP_FSM] Username cannot be empty\n");
+		return -1;
+	}
+
+	printf("[UDP_FSM] Username set to: %s\n", username);
+
+	for (int i = 0; username[i] != '\0'; i++) myTcpPort += username[i];
+	return 0;
+}
 

@@ -84,37 +84,7 @@ DWORD WINAPI ConsoleInputThread(LPVOID param) {
 }
 char username[BUFFER_SIZE];
 int myTcpPort = 8081;
-int getUsername() {
-	printf("[UDP_FSM] DeviceSearch::Start() called\n");
 
-	// LOGIN - Get username from user
-	printf("===========================\n");
-	printf("Welcome! Enter your username: \n");
-	printf("===========================\n");
-
-	if (fgets(username, BUFFER_SIZE, stdin) == NULL) {
-		printf("[UDP_FSM] Error reading username\n");
-		return -1;
-	}
-
-	// Remove newline character if present
-	size_t len = strlen(username);
-	if (len > 0 && username[len - 1] == '\n') {
-		username[len - 1] = '\0';
-		len--;
-	}
-
-	// Check if username is empty	
-	if (len == 0) {
-		printf("[UDP_FSM] Username cannot be empty\n");
-		return -1;
-	}
-
-	printf("[UDP_FSM] Username set to: %s\n", username);
-	
-	for (int i = 0; username[i] != '\0'; i++) myTcpPort += username[i];
-	return 0;
-}
 
 int main()
 {	
@@ -124,7 +94,7 @@ int main()
 		char ch = _getch();
 		return -1;
 	}
-	if (getUsername() == -1) {
+	if (DeviceSearch::getUsername() == -1) {
 		printf("Press a button to exit the application due to invalid username.\n");
 		char ch = _getch();
 		return -1;

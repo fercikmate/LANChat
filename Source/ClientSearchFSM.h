@@ -64,6 +64,7 @@ public:
 	void GetUsername();
 	void Start();
 	void SendUserInput(const char* text);
+	static int getUsername();
 	
 
 };

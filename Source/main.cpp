@@ -94,7 +94,7 @@ int main()
 
 	WaitForSingleObject(thread_handle, INFINITE);
 
-	/* Clean up */
+	/* Clean up */	
 	CloseHandle(thread_handle);
 	WSACleanup();
 	

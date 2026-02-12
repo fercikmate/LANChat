@@ -11,13 +11,7 @@
 #define TCP_FSM	1
 #define BUFFER_SIZE 512
 
-#define MSG_TCP_ALIVE_RECEIVED  0x0001
-#define MSG_TCP_OK_RECEIVED     0x0002
 #define MSG_USER_INPUT          0x0003
-#define MSG_TCP_CONNECTED       0x0004
-#define MSG_TCP_MESSAGE         0x0005
-#define MSG_TCP_DISCONNECTED    0x0006
-#define MSG_TCP_HEARTBEAT       0x0007
 #define MSG_TCP_SHUTDOWN        0x0008
 #define MSG_TCP_THREAD_START	0x0009
 #define IS_SERVER_PARAM        0x000A
@@ -26,6 +20,10 @@
 #define PARAM_IP_ADDRESS    0x02
 #define PARAM_PORT          0x03
 #define PARAM_DATA          0x04
+
+#define TIMER2_ID 1
+#define TIMER2_COUNT 60
+#define TIMER2_EXPIRED 0x21
 
 typedef stdMsg_pc16_pl16 StandardMessage;
 
@@ -71,7 +69,7 @@ private:
 	void ProcessConnectionRequest();
 	void ConnectionClosed();
 	void HandleSendData();
-	
+	void OnTimerExpired();
 
 
 public:

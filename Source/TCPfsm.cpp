@@ -17,6 +17,7 @@ TCPComs::TCPComs() : FiniteStateMachine(TCP_FSM, TCP_MB, 10, 10, 10),
 	ListenerThread(NULL),
 	dwListenerThreadID(0),
 	m_isServer(false),
+	m_peerPort(0),
 	hConnectionThread(NULL),
 	dwConnectionThreadID(0) {
 	m_peerIP[0] = '\0';
@@ -62,6 +63,8 @@ void TCPComs::Initialize() {
 	//  Register the handler for the wake-up message sent from createConnectionInstance
 	InitEventProc(IDLE, MSG_TCP_THREAD_START, (PROC_FUN_PTR)&TCPComs::ProcessConnectionRequest);
 	InitEventProc(CONNECTED, MSG_USER_INPUT, (PROC_FUN_PTR)&TCPComs::HandleSendData);
+	InitTimerBlock(TIMER2_ID, TIMER2_COUNT, TIMER2_EXPIRED);
+	InitEventProc(CONNECTED, TIMER2_EXPIRED, (PROC_FUN_PTR)&TCPComs::OnTimerExpired);
 }
 void TCPComs::Start() {
 	printf("[TCP_FSM] TCPComs::Start() called\n");
@@ -205,13 +208,16 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 		printf("[TCP_Thread] Connected to user %s!\n\n", pThis->m_peerUsername);
 	}
 
-	// Update state safely or just start the send/recv loop here.
+	// set state to connected and start heartbeat timer
 	pThis->SetState(CONNECTED);
+	pThis->StartTimer(TIMER2_ID);
 	char recvBuf[BUFFER_SIZE];
 	while (true) {
 		int bytesRecv = recv(pThis->m_tcpSocket, recvBuf, BUFFER_SIZE - 1, 0);
 		if (bytesRecv > 0) {
 			recvBuf[bytesRecv] = '\0';
+			pThis->StopTimer(TIMER2_ID); // Stop heartbeat timer on message receive
+			pThis->StartTimer(TIMER2_ID);
 			printf("\n[TCP_THREAD] Message from user [%s]: %s\n> ", pThis->m_peerUsername, recvBuf);
 		}
 		else {
@@ -249,7 +255,7 @@ void TCPComs::HandleSendData() {
 	uint8* dataParam = GetParam(PARAM_DATA);
 
 	if (dataParam && m_tcpSocket != INVALID_SOCKET) {
-		// Offset 4 is where the actual string starts in this kernel's Param format
+		// First 4 bytes are FSM kernel parameter header, actual data starts at offset 4
 		char* text = (char*)(dataParam + 4);
 
 		// Send it over the actual TCP socket
@@ -267,3 +273,18 @@ void TCPComs::SetPeerInfo(const char* ip, const char* name, bool server) {
 	this->m_peerUsername[BUFFER_SIZE - 1] = '\0';
 	this->m_isServer = server;
 }
+void TCPComs::OnTimerExpired() {
+
+	//send heartbeat message to peer to check if connection is still alive. If send fails, close connection and return to idle state
+	if (GetState() == CONNECTED) {
+		printf("[TCP_FSM] Heartbeat message sent for %s\n", m_peerUsername);
+		char* heartbeatMsg = "HEARTBEAT"; 
+		int result = send(m_tcpSocket, heartbeatMsg, strlen(heartbeatMsg), 0);
+		if (result == SOCKET_ERROR) {
+			printf("[TCP_FSM] Failed to send heartbeat: %d\n", WSAGetLastError());
+			ConnectionClosed();
+			SetState(IDLE);
+		}
+	}
+}
+

@@ -8,7 +8,7 @@
 #include "../kernel/LogFile.h"
 #include "TCPfsm.h"
 
-
+//send udp broadcast to the whole network
 #define CLIENT_ADDRESS "255.255.255.255"
 #define SERVER_PORT 8080
 
@@ -18,7 +18,6 @@ DeviceSearch::DeviceSearch() : FiniteStateMachine(UDP_FSM, UDP_MB, 10, 10, 10),
 	m_udpSocket(INVALID_SOCKET),
 	ListenerThread(NULL),
 	ThreadID(0),
-	m_retryCount(0),
 	m_consoleThreadStarted(false) {
 
 }
@@ -100,7 +99,7 @@ void DeviceSearch::SendUdpBroadcast() {
 
 	sendto(udpSocket, payload, strlen(payload), 0,
 		(struct sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
-	//safety stop
+	//stop existing timer to avoid duplicate timeout events
 	StopTimer(TIMER1_ID);
 	StartTimer(TIMER1_ID);
 
@@ -136,7 +135,7 @@ void DeviceSearch::StartUDPListening() {
 	
 	printf("[UDP_FSM] UDP listener started on port %d\n", SERVER_PORT);
 
-	// Create listener thread using Windows API, not member function
+	// Create listener thread
 	ListenerThread = ::CreateThread(
 		NULL, 0, UdpListenerThread,
 		(LPVOID)this, 0, &ThreadID
@@ -263,7 +262,7 @@ void DeviceSearch::UdpMsg_2_FSMMsg(const char* data, int length, sockaddr_in* se
 }
 void DeviceSearch::SendOk() {
 	// Send UDP OK response, create a new thread for a new fsm instance (each connection will have a new thread)
-	//then wait for syn, send ack, etc.
+	//this thread will "server" the connection, meaning it will wait for incoming TCP connection
 	printf("[UDP_FSM] SendOk called\n");
 	uint8* usernameParam = GetParam(PARAM_USERNAME);
 	uint8* ipParam = GetParam(PARAM_IP_ADDRESS);
@@ -327,7 +326,7 @@ void DeviceSearch::SendOk() {
 }
 void DeviceSearch::GotOk() {
 	// Got OK response, create a new thread for a new fsm instance (each connection will have a new thread)
-	//then send a syn, wait for ack, etc.
+	//this thread will be "client" in the connection, it will connect to the peer that sent the OK message
 	printf("[UDP_FSM] GotOk called\n");
 	uint8* usernameParam = GetParam(PARAM_USERNAME);
 	uint8* ipParam = GetParam(PARAM_IP_ADDRESS);
@@ -367,7 +366,7 @@ void DeviceSearch::createConnectionInstance(const char* peerIP, const char* peer
 
 	PrepareNewMessage(0x00, MSG_TCP_THREAD_START); // Reuse your existing msg type or create a new one
 	SetMsgToAutomate(TCP_FSM);
-	SetMsgObjectNumberTo(0xffffffff);
+	SetMsgObjectNumberTo(0xffffffff); // 0xffffffff tells FSM system to find first available IDLE instance
 	AddParam(PARAM_USERNAME, (uint16)strlen(peerUsername), (uint8*)peerUsername);
 	AddParam(PARAM_IP_ADDRESS, (uint16)strlen(peerIP), (uint8*)peerIP);
 	AddParam(PARAM_PORT, 2, (uint8*)&port);
@@ -453,15 +452,14 @@ DWORD WINAPI DeviceSearch::ConsoleInputThread(LPVOID param) {
 	return 0;
 }
 void DeviceSearch::OnTimerExpired() {
-	m_retryCount++;
+
 
 		// assume we're alone OR username is taken
 		printf("[UDP_FSM] No response after %d seconds. Enter new username:\n", TIMER1_COUNT);
-		m_retryCount = 0;
+		
 
-		if (getUsername() == -1) {
+		while (getUsername() == -1) {
 			printf("Invalid name.\n");
-			return;
 		}
 		SendUdpBroadcast();
 }

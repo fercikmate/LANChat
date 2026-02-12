@@ -62,7 +62,6 @@ private:
 	void GotOkDirect(const char* peerUsername, const char* peerIP);
 	static DWORD WINAPI ConsoleInputThread(LPVOID param);
 	void OnTimerExpired();
-	int m_retryCount;           // Track retry attempts
 	bool m_consoleThreadStarted; // Flag to start console thread only once
 public:
 	DeviceSearch();

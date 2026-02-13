@@ -63,8 +63,8 @@ void TCPComs::Initialize() {
 	//  Register the handler for the wake-up message sent from createConnectionInstance
 	InitEventProc(IDLE, MSG_TCP_THREAD_START, (PROC_FUN_PTR)&TCPComs::ProcessConnectionRequest);
 	InitEventProc(CONNECTED, MSG_USER_INPUT, (PROC_FUN_PTR)&TCPComs::HandleSendData);
-	InitTimerBlock(TIMER2_ID, TIMER2_COUNT, TIMER2_EXPIRED);
-	InitEventProc(CONNECTED, TIMER2_EXPIRED, (PROC_FUN_PTR)&TCPComs::OnTimerExpired);
+//	InitTimerBlock(TIMER2_ID, TIMER2_COUNT, TIMER2_EXPIRED);
+//	InitEventProc(CONNECTED, TIMER2_EXPIRED, (PROC_FUN_PTR)&TCPComs::OnTimerExpired);
 }
 void TCPComs::Start() {
 	printf("[TCP_FSM] TCPComs::Start() called\n");
@@ -171,8 +171,10 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 		closesocket(pThis->m_tcpSocket); // Close listener
 		pThis->m_tcpSocket = clientSock; // Use client socket for communication
 	}
+
+	//CLIENT LOGIC
 	else {
-		// Connect logic
+		//if we're a client, we need to connect to the server
 
 		printf("[TCP_Thread] Connecting to user %s at %s:%d...\n\n",
 		pThis->m_peerUsername, pThis->m_peerIP, pThis->m_peerPort);
@@ -209,15 +211,16 @@ DWORD WINAPI TCPComs::ConnectionWorkerThread(LPVOID param) {
 	}
 
 	// set state to connected and start heartbeat timer
+//	pThis->StartTimer(TIMER2_ID);
 	pThis->SetState(CONNECTED);
-	pThis->StartTimer(TIMER2_ID);
+	
 	char recvBuf[BUFFER_SIZE];
 	while (true) {
 		int bytesRecv = recv(pThis->m_tcpSocket, recvBuf, BUFFER_SIZE - 1, 0);
 		if (bytesRecv > 0) {
 			recvBuf[bytesRecv] = '\0';
-			pThis->StopTimer(TIMER2_ID); // Stop heartbeat timer on message receive
-			pThis->StartTimer(TIMER2_ID);
+	//		pThis->StopTimer(TIMER2_ID); // Stop heartbeat timer on message receive
+		//	pThis->StartTimer(TIMER2_ID);
 			printf("\n[TCP_THREAD] Message from user [%s]: %s\n> ", pThis->m_peerUsername, recvBuf);
 		}
 		else {

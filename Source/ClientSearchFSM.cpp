@@ -452,8 +452,8 @@ DWORD WINAPI DeviceSearch::ConsoleInputThread(LPVOID param) {
 	return 0;
 }
 void DeviceSearch::OnTimerExpired() {
-
-
+		
+	SetState(LOGIN);
 		// assume we're alone OR username is taken
 		printf("[UDP_FSM] No response after %d seconds. Enter new username:\n", TIMER1_COUNT);
 		
@@ -462,4 +462,5 @@ void DeviceSearch::OnTimerExpired() {
 			printf("Invalid name.\n");
 		}
 		SendUdpBroadcast();
+	SetState(IDLE);
 }

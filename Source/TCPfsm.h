@@ -28,7 +28,7 @@
 typedef stdMsg_pc16_pl16 StandardMessage;
 
 class TCPComs : public FiniteStateMachine {
-	enum TCPComsStates { IDLE, CONNECTING_SERVER, CONNECTING_CLIENT, CONNECTED, SHUTDOWN_SENT, SHUTDOWN_REC, HEARTBEAT };
+	enum TCPComsStates { IDLE, CONNECTED };
 
 	StandardMessage StandardMsgCoding;
 

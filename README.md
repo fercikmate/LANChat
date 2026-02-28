@@ -1,47 +1,63 @@
 # LANChat
-## Decentralized LAN Chat (FSM-based)
+## Overview
+Fully decentralized peer-to-peer chat application for local area networks. 
+No central server required - peers discover each other automatically via UDP 
+broadcast and establish direct TCP connections for messaging.
 
-This project implements a decentralized LAN chat application where all clients communicate directly, without a broker or central server.
+Built using RT-RK FSM (Finite State Machine) library for robust protocol 
+state management.
 
-## Concept
+### Architecture
 
-Each client discovers other active clients in the local subnet using UDP discovery.
+### Two-FSM System
+1. **UDP Discovery FSM** (1 instance per client)
+   - Broadcasts ALIVE messages to discover peers
+   - Responds to discovery with OK messages  
+   - Manages 15-second discovery timeout
+   - Dispatches TCP connection requests to pool
 
-After discovery, clients establish direct TCP connections with each other.
+2. **TCP Connection FSM** (pool of 10 instances)
+   - Handles individual peer-to-peer connections
+   - Supports up to 10 simultaneous connections
+   - Role assignment: ALIVE sender = client, OK sender = server
 
-For every TCP connection, a separate worker thread is created.
+### Threading Model
 
-Each worker thread owns one FSM instance, which controls the protocol logic for that connection.
+**Main Thread:**
+- Initializes Winsock
+- Creates SystemThread
+- Keeps process alive (infinite loop)
 
-FSMs handle connection setup, message exchange, and un/graceful shutdown.
+**SystemThread:**
+- Runs FSM kernel event loop
+- Processes FSM messages sequentially
+- Manages timers and state transitions
 
-Messages are broadcast to all connected peers in the subnet and displayed with sender identification.
+**UdpListenerThread:**
+- Receives UDP broadcasts on port 8080
+- Converts network packets to FSM messages
+- Runs continuously in background
 
-## Architecture
+**ConsoleInputThread:**
+- Reads user input from stdin
+- Broadcasts messages to all active TCP connections
+- Started lazily on first connection
 
-### Main thread
+**ConnectionWorkerThread** (×10 max):
+- Manages individual TCP connection lifecycle
+- Server mode: bind() → listen() → accept()
+- Client mode: connect() with 5 retry attempts (500ms delays)
+- Runs send/receive loop until disconnection
+### Port Assignment
+TCP ports are deterministically calculated from username (implemented mainly for local testing)
 
-Parses command-line parameters (client name)
+### State Machines
 
-Handles UDP discovery
+**UDP Discovery FSM States:**
+- `LOGIN`: Initial state, username entry
+- `IDLE`: Operational state, handles discovery messages, doesn't connect, spawns for each individual connection
 
-Accepts incoming TCP connections
-
-Spawns worker threads
-
-### Worker thread
-
-Manages one TCP connection
-
-Runs a dedicated FSM instance
-
-## FSM
-
-Implements protocol states and transitions
-
-Reacts to events such as message received, send request, and disconnect
-
-One FSM instance per TCP connection, they represent the state of the thread itself, not the client 
-
-FSM communicates with the network via win system support
+**TCP Connection FSM States:**
+- `IDLE`: Available in pool, waiting for connection request
+- `CONNECTED`: Active TCP connection with peer
 
